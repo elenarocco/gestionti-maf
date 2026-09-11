@@ -1,0 +1,12 @@
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\bin\Debug\net10.0\MafTi.Domain.deps.json
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\bin\Debug\net10.0\MafTi.Domain.dll
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\bin\Debug\net10.0\MafTi.Domain.pdb
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\MafTi.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\MafTi.Domain.AssemblyInfoInputs.cache
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\MafTi.Domain.AssemblyInfo.cs
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\MafTi.Domain.csproj.CoreCompileInputs.cache
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\MafTi.Domain.sourcelink.json
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\MafTi.Domain.dll
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\refint\MafTi.Domain.dll
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\MafTi.Domain.pdb
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Domain\obj\Debug\net10.0\ref\MafTi.Domain.dll
