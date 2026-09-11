@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MafTi.Api/MafTi.Api.csproj" />
+    <Project Path="src/MafTi.Application/MafTi.Application.csproj" />
+    <Project Path="src/MafTi.Domain/MafTi.Domain.csproj" />
+    <Project Path="src/MafTi.Infrastructure/MafTi.Infrastructure.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,6 @@
+@MafTi.Api_HostAddress = http://localhost:5153
+
+GET {{MafTi.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
