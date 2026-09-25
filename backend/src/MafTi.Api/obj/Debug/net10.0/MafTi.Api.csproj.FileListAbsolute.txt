@@ -127,3 +127,6 @@ C:\Proyectos\gestionti-maf\backend\src\MafTi.Api\obj\Debug\net10.0\refint\MafTi.
 C:\Proyectos\gestionti-maf\backend\src\MafTi.Api\obj\Debug\net10.0\MafTi.Api.pdb
 C:\Proyectos\gestionti-maf\backend\src\MafTi.Api\obj\Debug\net10.0\MafTi.Api.genruntimeconfig.cache
 C:\Proyectos\gestionti-maf\backend\src\MafTi.Api\obj\Debug\net10.0\ref\MafTi.Api.dll
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Api\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Api\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+C:\Proyectos\gestionti-maf\backend\src\MafTi.Api\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll

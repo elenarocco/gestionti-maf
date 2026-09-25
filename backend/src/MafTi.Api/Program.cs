@@ -3,24 +3,37 @@ using MafTi.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuración de Entity Framework Core con PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
-// Servicios OpenAPI / Swagger
 builder.Services.AddOpenApi();
+builder.Services.AddControllers(); 
+builder.Services.AddEndpointsApiExplorer(); 
+builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("PermitirAngular", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
 
-// Configuración del pipeline HTTP
+app.UseCors("PermitirAngular");
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.UseSwagger(); 
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
+app.MapControllers(); 
 
-// Endpoint de prueba
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"

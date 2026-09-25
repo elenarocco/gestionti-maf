@@ -81,6 +81,102 @@ namespace MafTi.Infrastructure.Migrations
                     b.ToTable("Catalogos");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.HistorialSolicitud", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Accion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Comentario")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RealizadoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SolicitudId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RealizadoPorId");
+
+                    b.HasIndex("SolicitudId");
+
+                    b.ToTable("HistorialSolicitudes");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.Permiso", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Descripcion")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Permisos");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.Rol", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Descripcion")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Roles");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.RolPermiso", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("PermisoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RolId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PermisoId");
+
+                    b.HasIndex("RolId");
+
+                    b.ToTable("RolPermisos");
+                });
+
             modelBuilder.Entity("MafTi.Domain.Solicitud", b =>
                 {
                     b.Property<int>("Id")
@@ -124,6 +220,29 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasIndex("TrabajadorId");
 
                     b.ToTable("Solicitudes");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.SolicitudDetalle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CatalogoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SolicitudId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CatalogoId");
+
+                    b.HasIndex("SolicitudId");
+
+                    b.ToTable("SolicitudDetalles");
                 });
 
             modelBuilder.Entity("MafTi.Domain.Trabajador", b =>
@@ -202,6 +321,12 @@ namespace MafTi.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AreaId");
+
+                    b.HasIndex("DireccionCorporativaId");
+
+                    b.HasIndex("LugarTrabajoId");
+
                     b.ToTable("Trabajadores");
                 });
 
@@ -219,17 +344,19 @@ namespace MafTi.Infrastructure.Migrations
                     b.Property<int?>("AreaId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("CorreoAD")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("RolId")
+                        .HasColumnType("integer");
 
-                    b.Property<string>("Rol")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("TrabajadorId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AreaId");
+
+                    b.HasIndex("RolId");
+
+                    b.HasIndex("TrabajadorId");
 
                     b.ToTable("UsuariosSistema");
                 });
@@ -259,6 +386,44 @@ namespace MafTi.Infrastructure.Migrations
                     b.Navigation("Trabajador");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.HistorialSolicitud", b =>
+                {
+                    b.HasOne("MafTi.Domain.UsuarioSistema", "RealizadoPor")
+                        .WithMany()
+                        .HasForeignKey("RealizadoPorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
+                        .WithMany()
+                        .HasForeignKey("SolicitudId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RealizadoPor");
+
+                    b.Navigation("Solicitud");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.RolPermiso", b =>
+                {
+                    b.HasOne("MafTi.Domain.Permiso", "Permiso")
+                        .WithMany()
+                        .HasForeignKey("PermisoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MafTi.Domain.Rol", "Rol")
+                        .WithMany()
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Permiso");
+
+                    b.Navigation("Rol");
+                });
+
             modelBuilder.Entity("MafTi.Domain.Solicitud", b =>
                 {
                     b.HasOne("MafTi.Domain.UsuarioSistema", "CreadoPor")
@@ -284,13 +449,75 @@ namespace MafTi.Infrastructure.Migrations
                     b.Navigation("Trabajador");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.SolicitudDetalle", b =>
+                {
+                    b.HasOne("MafTi.Domain.Catalogo", "Catalogo")
+                        .WithMany()
+                        .HasForeignKey("CatalogoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
+                        .WithMany()
+                        .HasForeignKey("SolicitudId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Catalogo");
+
+                    b.Navigation("Solicitud");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.Trabajador", b =>
+                {
+                    b.HasOne("MafTi.Domain.Catalogo", "Area")
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MafTi.Domain.Catalogo", "DireccionCorporativa")
+                        .WithMany()
+                        .HasForeignKey("DireccionCorporativaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MafTi.Domain.Catalogo", "LugarTrabajo")
+                        .WithMany()
+                        .HasForeignKey("LugarTrabajoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Area");
+
+                    b.Navigation("DireccionCorporativa");
+
+                    b.Navigation("LugarTrabajo");
+                });
+
             modelBuilder.Entity("MafTi.Domain.UsuarioSistema", b =>
                 {
                     b.HasOne("MafTi.Domain.Catalogo", "Area")
                         .WithMany()
                         .HasForeignKey("AreaId");
 
+                    b.HasOne("MafTi.Domain.Rol", "Rol")
+                        .WithMany()
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MafTi.Domain.Trabajador", "Trabajador")
+                        .WithMany()
+                        .HasForeignKey("TrabajadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Area");
+
+                    b.Navigation("Rol");
+
+                    b.Navigation("Trabajador");
                 });
 #pragma warning restore 612, 618
         }

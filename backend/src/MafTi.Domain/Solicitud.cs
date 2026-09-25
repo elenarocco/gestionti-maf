@@ -12,6 +12,6 @@ public class Solicitud
     public string? MotivoRechazo { get; set; }
     public int? SolicitudOrigenId { get; set; }
     public Solicitud? SolicitudOrigen { get; set; }
-    public DateTime FechaCreacion { get; set; } = DateTime.Now;
+    public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
     public DateTime FechaVencimientoSLA { get; set; }
 }
