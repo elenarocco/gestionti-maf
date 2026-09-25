@@ -1,9 +1,20 @@
+using System.Text.Json.Serialization;
+
 namespace MafTi.Domain;
 
 public class Trabajador
 {
     public int Id { get; set; }
+    
+    [JsonIgnore]
+    public Catalogo? DireccionCorporativa { get; set; }
 
+    [JsonIgnore]
+    public Catalogo? Area { get; set; }
+
+    [JsonIgnore]
+    public Catalogo? LugarTrabajo { get; set; }
+    
     public string Rut { get; set; } = string.Empty;
     public string PrimerNombre { get; set; } = string.Empty;
     public string? SegundoNombre { get; set; }
@@ -12,6 +23,7 @@ public class Trabajador
     public DateOnly FechaNacimiento { get; set; }
     public string Sexo { get; set; } = string.Empty;
     public string Correo { get; set; } = string.Empty;
+    
     public int DireccionCorporativaId { get; set; } 
     public int AreaId { get; set; }                  
     public string Cargo { get; set; } = string.Empty;
