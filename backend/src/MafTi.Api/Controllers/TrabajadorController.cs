@@ -71,12 +71,22 @@ public class TrabajadorController : ControllerBase
         };
     }
   [HttpGet("sugerir-correo")]
-  public async Task<ActionResult<object>> Sugerircorreo(string PrimerNombre, string PrimerApellido)
-    {
-        var sugerido = await GeneradorCorreoService.Generar(PrimerNombre, PrimerApellido,
-            async correo => await _context.Trabajadores.AnyAsync(t => t.Correo == correo));
-        return Ok(new {correo = sugerido, disponible = sugerido != null});
-    }
+public async Task<ActionResult<SugerenciaCorreo>> SugerirCorreo(string rut, string primerNombre, string primerApellido, string? segundoApellido = null)
+{
+    var rutLimpio = TrabajadorValidator.LimpiarRut(rut);
+
+    var resultado = await GeneradorCorreoService.Generar(
+        rutLimpio, primerNombre, primerApellido, segundoApellido,
+        async r =>
+        {
+            var inactivo = await _context.Trabajadores
+                .FirstOrDefaultAsync(t => t.Rut == TrabajadorValidator.FormatearParaGuardar(r) && !t.Activo);
+            return inactivo?.Correo;
+        },
+        async correo => await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo));
+
+    return Ok(resultado);
+}
 
  [HttpPost]
 public async Task<ActionResult<TrabajadorDetalleDto>> Create(TrabajadorCreateDto dto)
