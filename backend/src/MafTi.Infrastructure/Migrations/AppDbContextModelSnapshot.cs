@@ -282,6 +282,9 @@ namespace MafTi.Infrastructure.Migrations
                     b.Property<DateOnly>("FechaNacimiento")
                         .HasColumnType("date");
 
+                    b.Property<DateOnly?>("FechaSalida")
+                        .HasColumnType("date");
+
                     b.Property<string>("HomologarAccesosDesde")
                         .HasColumnType("text");
 

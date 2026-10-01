@@ -2,13 +2,14 @@ namespace MafTi.Api.Dtos;
 
 public class SolicitudListaDto
 {
-    public int Id {get; set;}
-    public string TrabajadorNombre {get; set;} = string.Empty;
+    public int Id { get; set; }
+    public string TrabajadorNombre { get; set; } = string.Empty;
+    public string AreaNombre { get; set; } = string.Empty;
+    public bool EsUrgente { get; set; }
     public string Tipo { get; set; } = string.Empty;
     public string Estado { get; set; } = string.Empty;
     public DateTime FechaCreacion { get; set; }
     public DateTime FechaVencimientoSLA { get; set; }
-
 }
 
 public class SolicitudDetalleDto

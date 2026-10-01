@@ -31,6 +31,7 @@ public class Trabajador
 
     public bool EsCuentaGenerica { get; set; }
     public DateOnly FechaIncorporacion { get; set; }
+    public DateOnly? FechaSalida { get; set; }
     public string? DireccionDomicilio { get; set; }
     public string? JefeDirecto { get; set; }
     public string? HomologarAccesosDesde { get; set; }
