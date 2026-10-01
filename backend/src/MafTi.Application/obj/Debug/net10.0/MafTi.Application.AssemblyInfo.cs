@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MafTi.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a5e24abce6c6085b0a2d8ebd81ffb2502596c1d2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bc9eed8cd4aaeddccb24653fb4f932523fdfe2e4")]
 [assembly: System.Reflection.AssemblyProductAttribute("MafTi.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MafTi.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
