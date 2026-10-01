@@ -21,7 +21,11 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
-
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Trabajadores.AsNoTracking().Take(1).ToListAsync();
+}
 app.UseCors("PermitirAngular");
 
 if (app.Environment.IsDevelopment())

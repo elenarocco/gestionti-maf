@@ -4,7 +4,7 @@ namespace MafTi.Application;
 
 public static class TrabajadorValidator
 {
-    public static List<string> Validar(Trabajador trabajador)
+    public static async Task<List<string>> ValidarAsync(Trabajador trabajador, Func<string, Task<bool>> correoYaExisteAsync)
     {
         var errores = new List<string>();
 
@@ -20,17 +20,11 @@ public static class TrabajadorValidator
             var dv = rutLimpio.Substring(rutLimpio.Length - 1, 1);
 
             if (cuerpo.Length > 8)
-            {
                 errores.Add("El RUT no puede tener más de 8 dígitos en el cuerpo.");
-            }
             else if (!cuerpo.All(char.IsDigit))
-            {
                 errores.Add("El RUT solo puede contener números (más el dígito verificador).");
-            }
             else if (!EsDigitoVerificadorValido(cuerpo, dv))
-            {
                 errores.Add("El dígito verificador del RUT no es correcto.");
-            }
         }
 
         var hoy = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -42,20 +36,28 @@ public static class TrabajadorValidator
         {
             var edad = hoy.Year - trabajador.FechaNacimiento.Year;
             if (trabajador.FechaNacimiento > hoy.AddYears(-edad)) edad--;
-
             if (edad < 18 || edad > 75)
-            {
                 errores.Add("La edad debe estar entre 18 y 75 años.");
-            }
+        }
+
+        var correo = trabajador.Correo?.Trim().ToLower() ?? "";
+        if (string.IsNullOrWhiteSpace(correo))
+        {
+            errores.Add("El correo es obligatorio.");
+        }
+        else if (!correo.EndsWith("@mafchile.com"))
+        {
+            errores.Add("El correo debe ser del dominio institucional (@mafchile.com).");
+        }
+        else if (await correoYaExisteAsync(correo))
+        {
+            errores.Add("Ese correo ya está en uso por otro trabajador.");
         }
 
         return errores;
     }
 
-    public static string LimpiarRut(string rut)
-    {
-        return rut.Replace(".", "").Replace("-", "").Trim().ToUpper();
-    }
+    public static string LimpiarRut(string rut) => rut.Replace(".", "").Replace("-", "").Trim().ToUpper();
 
     public static string FormatearParaGuardar(string rut)
     {
@@ -68,24 +70,15 @@ public static class TrabajadorValidator
 
     private static bool EsDigitoVerificadorValido(string cuerpo, string dv)
     {
-        int suma = 0;
-        int multiplicador = 2;
-
+        int suma = 0, multiplicador = 2;
         for (int i = cuerpo.Length - 1; i >= 0; i--)
         {
             suma += (cuerpo[i] - '0') * multiplicador;
             multiplicador++;
             if (multiplicador > 7) multiplicador = 2;
         }
-
         int resto = 11 - (suma % 11);
-        string dvEsperado = resto switch
-        {
-            11 => "0",
-            10 => "K",
-            _ => resto.ToString()
-        };
-
+        string dvEsperado = resto switch { 11 => "0", 10 => "K", _ => resto.ToString() };
         return dv == dvEsperado;
     }
 }
