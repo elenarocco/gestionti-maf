@@ -26,8 +26,10 @@ public class Trabajador
     
     public int DireccionCorporativaId { get; set; } 
     public int AreaId { get; set; }                  
-    public string Cargo { get; set; } = string.Empty;
-    public int LugarTrabajoId { get; set; }           
+    public int LugarTrabajoId { get; set; }      
+    public int CargoId { get; set; }
+    [JsonIgnore]
+    public Catalogo? Cargo { get; set; }     
 
     public bool EsCuentaGenerica { get; set; }
     public DateOnly FechaIncorporacion { get; set; }

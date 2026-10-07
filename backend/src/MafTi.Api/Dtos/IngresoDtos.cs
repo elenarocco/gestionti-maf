@@ -12,9 +12,8 @@ public class IngresoCreateDto
     public string Correo { get; set; } = string.Empty;
     public int DireccionCorporativaId { get; set; }
     public int AreaId { get; set; }
-    public string Cargo { get; set; } = string.Empty;
+    public int CargoId { get; set; }
     public int LugarTrabajoId { get; set; }
-    public bool EsCuentaGenerica { get; set; }
     public DateOnly FechaIncorporacion { get; set; }
     public string? DireccionDomicilio { get; set; }
     public string? JefeDirecto { get; set; }
