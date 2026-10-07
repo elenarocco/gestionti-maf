@@ -18,24 +18,61 @@ public class SolicitudController : ControllerBase
     {
         _context = context;
     }
+    private static readonly Dictionary<string, string> PermisoPorTipo = new()
+{
+    { "Ingreso", "CrearSolicitudIngreso" },
+    { "Modificación", "CrearSolicitudModificacion" },
+    { "Bloqueo", "CrearSolicitudBloqueo" },
+    { "VPN", "SolicitarAccesoVPN" }
+};
 
     [HttpGet]
-    public async Task<ActionResult<PaginacionResultado<SolicitudListaDto>>> GetAll(int pagina = 1, int tamanoPagina = 20)
+    public async Task<ActionResult<PaginacionResultado<SolicitudListaDto>>> GetAll(
+        int pagina = 1, int tamanoPagina = 20, string? tipo = null,
+        string? estado = null, bool? urgente = null, DateTime? desde = null, DateTime? hasta = null)
     {
-        var query = _context.Solicitudes
+        var rolActual = Request.Headers["X-Rol-Simulado"].ToString();
+
+        bool veTodo = await _context.RolPermisos
+            .Include(rp => rp.Rol).Include(rp => rp.Permiso)
+            .AnyAsync(rp => rp.Rol!.Nombre == rolActual && rp.Permiso!.Codigo == "ConsultarTodasLasSolicitudes");
+
+        var query = _context.Solicitudes.AsQueryable();
+
+        if (!veTodo)
+        {
+            var tiposPermitidos = new List<string>();
+            foreach (var par in PermisoPorTipo)
+            {
+                var tieneCreacion = await _context.RolPermisos
+                    .Include(rp => rp.Rol).Include(rp => rp.Permiso)
+                    .AnyAsync(rp => rp.Rol!.Nombre == rolActual && rp.Permiso!.Codigo == par.Value);
+                if (tieneCreacion) tiposPermitidos.Add(par.Key);
+            }
+            query = query.Where(s => tiposPermitidos.Contains(s.Tipo));
+        }
+
+         if (!string.IsNullOrEmpty(tipo)) query = query.Where(s => s.Tipo == tipo);
+         if (!string.IsNullOrEmpty(estado)) query = query.Where(s => s.Estado == estado);
+         if (urgente == true) query = query.Where(s => s.Estado == "Pendiente" && s.FechaVencimientoSLA < DateTime.UtcNow);
+         if (desde.HasValue) query = query.Where(s => s.FechaCreacion >= desde.Value);
+         if (hasta.HasValue) query = query.Where(s => s.FechaCreacion <= hasta.Value);
+
+        var resultado = await query
             .OrderByDescending(s => s.FechaCreacion)
             .Select(s => new SolicitudListaDto
             {
                 Id = s.Id,
-                EsUrgente = s.Estado == "Pendiente" && s.FechaVencimientoSLA < DateTime.UtcNow,
                 TrabajadorNombre = s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido,
+                AreaNombre = s.Trabajador!.Area!.Nombre,
                 Tipo = s.Tipo,
                 Estado = s.Estado,
                 FechaCreacion = s.FechaCreacion,
-                FechaVencimientoSLA = s.FechaVencimientoSLA
-            });
+                FechaVencimientoSLA = s.FechaVencimientoSLA,
+                EsUrgente = s.Estado == "Pendiente" && s.FechaVencimientoSLA < DateTime.UtcNow
+            })
+            .PaginarAsync(pagina, tamanoPagina);
 
-        var resultado = await query.PaginarAsync(pagina, tamanoPagina);
         return Ok(resultado);
     }
 
@@ -73,18 +110,17 @@ public class SolicitudController : ControllerBase
         var nuevoTrabajador = new Trabajador
         {
             Rut = TrabajadorValidator.FormatearParaGuardar(dto.Rut),
-            PrimerNombre = dto.PrimerNombre,
-            SegundoNombre = dto.SegundoNombre,
-            PrimerApellido = dto.PrimerApellido,
-            SegundoApellido = dto.SegundoApellido,
+            PrimerNombre = FormatoNombre.Normalizar(dto.PrimerNombre)!,
+            SegundoNombre = FormatoNombre.Normalizar(dto.SegundoNombre),
+            PrimerApellido = FormatoNombre.Normalizar(dto.PrimerApellido)!,
+            SegundoApellido = FormatoNombre.Normalizar(dto.SegundoApellido),
             FechaNacimiento = dto.FechaNacimiento,
             Sexo = dto.Sexo,
             Correo = dto.Correo,
             DireccionCorporativaId = dto.DireccionCorporativaId,
             AreaId = dto.AreaId,
-            Cargo = dto.Cargo,
+            CargoId = dto.CargoId,
             LugarTrabajoId = dto.LugarTrabajoId,
-            EsCuentaGenerica = dto.EsCuentaGenerica,
             FechaIncorporacion = dto.FechaIncorporacion,
             DireccionDomicilio = dto.DireccionDomicilio,
             JefeDirecto = dto.JefeDirecto,
@@ -93,10 +129,17 @@ public class SolicitudController : ControllerBase
             SolicitaTelefono = dto.SolicitaTelefono,
             Activo = true
         };
+        
 
-        var errores = await TrabajadorValidator.ValidarAsync(nuevoTrabajador, async correo =>
-        await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo));
-
+        var errores = await TrabajadorValidator.ValidarAsync(
+            nuevoTrabajador,
+            async correo => await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo),
+            async rut => await _context.Trabajadores.AnyAsync(t => t.Rut == rut && t.Activo));;
+            
+        if (errores.Any())
+        {
+            return BadRequest(new { errores });
+        }
         using var transaccion = await _context.Database.BeginTransactionAsync();
 
         _context.Trabajadores.Add(nuevoTrabajador);
@@ -123,6 +166,7 @@ public class SolicitudController : ControllerBase
                 CatalogoId = catalogoId
             });
         }
+        
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
         
@@ -132,6 +176,8 @@ public class SolicitudController : ControllerBase
                 SolicitudId = nuevaSolicitud.Id,
                 FechaVencimientoSLA = nuevaSolicitud.FechaVencimientoSLA
         });
+
+        
                
             
     }

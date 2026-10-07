@@ -24,6 +24,12 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
         .HasOne(t => t.LugarTrabajo)
         .WithMany()
         .HasForeignKey(t => t.LugarTrabajoId);
+        
+    modelBuilder.Entity<Trabajador>()
+    .HasOne(t => t.Cargo)
+    .WithMany()
+    .HasForeignKey(t => t.CargoId)
+    .OnDelete(DeleteBehavior.Restrict);
 }
 
     public DbSet<Trabajador> Trabajadores { get; set; }

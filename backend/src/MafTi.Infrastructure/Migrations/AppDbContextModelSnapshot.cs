@@ -259,9 +259,8 @@ namespace MafTi.Infrastructure.Migrations
                     b.Property<int>("AreaId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Cargo")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("CargoId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Correo")
                         .IsRequired()
@@ -325,6 +324,8 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AreaId");
+
+                    b.HasIndex("CargoId");
 
                     b.HasIndex("DireccionCorporativaId");
 
@@ -479,6 +480,12 @@ namespace MafTi.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MafTi.Domain.Catalogo", "Cargo")
+                        .WithMany()
+                        .HasForeignKey("CargoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("MafTi.Domain.Catalogo", "DireccionCorporativa")
                         .WithMany()
                         .HasForeignKey("DireccionCorporativaId")
@@ -492,6 +499,8 @@ namespace MafTi.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Area");
+
+                    b.Navigation("Cargo");
 
                     b.Navigation("DireccionCorporativa");
 
