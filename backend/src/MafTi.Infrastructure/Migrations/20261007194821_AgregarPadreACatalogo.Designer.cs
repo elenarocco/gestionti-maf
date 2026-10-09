@@ -3,6 +3,7 @@ using System;
 using MafTi.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MafTi.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007194821_AgregarPadreACatalogo")]
+    partial class AgregarPadreACatalogo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -225,45 +228,6 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasIndex("TrabajadorId");
 
                     b.ToTable("Solicitudes");
-                });
-
-            modelBuilder.Entity("MafTi.Domain.SolicitudBloqueo", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool?>("CasillaOpera")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("EsTemporal")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("FechaFin")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("FechaInicio")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Justificacion")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("SolicitudId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool?>("TienePc")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SolicitudId")
-                        .IsUnique();
-
-                    b.ToTable("SolicitudesBloqueo");
                 });
 
             modelBuilder.Entity("MafTi.Domain.SolicitudDetalle", b =>
@@ -505,17 +469,6 @@ namespace MafTi.Infrastructure.Migrations
                     b.Navigation("SolicitudOrigen");
 
                     b.Navigation("Trabajador");
-                });
-
-            modelBuilder.Entity("MafTi.Domain.SolicitudBloqueo", b =>
-                {
-                    b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
-                        .WithOne()
-                        .HasForeignKey("MafTi.Domain.SolicitudBloqueo", "SolicitudId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Solicitud");
                 });
 
             modelBuilder.Entity("MafTi.Domain.SolicitudDetalle", b =>

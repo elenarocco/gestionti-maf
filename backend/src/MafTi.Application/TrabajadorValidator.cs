@@ -7,7 +7,10 @@ public static class TrabajadorValidator
     public static async Task<List<string>> ValidarAsync(
         Trabajador trabajador,
         Func<string, Task<bool>> correoYaExisteAsync,
-        Func<string, Task<bool>> rutYaExisteActivoAsync)
+        Func<string, Task<bool>> rutYaExisteActivoAsync,
+        Func<int, int, Task<bool>> areaPerteneceADireccionAsync)
+        
+        
     {
         var errores = new List<string>();
 
@@ -33,6 +36,10 @@ public static class TrabajadorValidator
         if (await rutYaExisteActivoAsync(FormatearParaGuardar(trabajador.Rut)))
         {
             errores.Add("Ya existe un trabajador activo con ese RUT.");
+        }
+          if (!await areaPerteneceADireccionAsync(trabajador.AreaId, trabajador.DireccionCorporativaId))
+        {
+            errores.Add("El área seleccionada no pertenece a la dirección corporativa elegida.");
         }
 
         var hoy = DateOnly.FromDateTime(DateTime.UtcNow);

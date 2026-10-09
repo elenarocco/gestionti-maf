@@ -24,12 +24,27 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
         .HasOne(t => t.LugarTrabajo)
         .WithMany()
         .HasForeignKey(t => t.LugarTrabajoId);
-        
+
     modelBuilder.Entity<Trabajador>()
     .HasOne(t => t.Cargo)
     .WithMany()
     .HasForeignKey(t => t.CargoId)
     .OnDelete(DeleteBehavior.Restrict);
+    
+    modelBuilder.Entity<Catalogo>()
+    .HasOne(c => c.Padre)
+    .WithMany()
+    .HasForeignKey(c => c.PadreId)
+    .OnDelete(DeleteBehavior.Restrict);
+
+    modelBuilder.Entity<SolicitudBloqueo>(e =>
+{
+    e.HasOne(x => x.Solicitud).WithOne()
+        .HasForeignKey<SolicitudBloqueo>(x => x.SolicitudId)
+        .OnDelete(DeleteBehavior.Restrict);
+    e.HasIndex(x => x.SolicitudId).IsUnique();
+    e.Property(x => x.Justificacion).HasMaxLength(200).IsRequired();
+});
 }
 
     public DbSet<Trabajador> Trabajadores { get; set; }
@@ -42,4 +57,5 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<Rol> Roles { get; set; }
     public DbSet<Permiso> Permisos { get; set; }
     public DbSet<RolPermiso> RolPermisos { get; set; }
+    public DbSet<SolicitudBloqueo> SolicitudesBloqueo => Set<SolicitudBloqueo>();
 }

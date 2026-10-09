@@ -18,10 +18,14 @@ public static class GeneradorCorreoService
         Func<string, Task<bool>> correoYaExisteAsync)
     {
         // Excepción por reincorporación: si este RUT ya existió (inactivo), se reutiliza su correo anterior
-        var correoAnterior = await buscarCorreoDeInactivoPorRutAsync(rut);
-        if (correoAnterior != null)
+        // Excepción por reincorporación: solo se revisa si se informó un RUT
+        if (!string.IsNullOrWhiteSpace(rut))
         {
-            return new SugerenciaCorreo { Correo = correoAnterior, Disponible = true, EsReincorporacion = true };
+            var correoAnterior = await buscarCorreoDeInactivoPorRutAsync(rut);
+            if (correoAnterior != null)
+            {
+                return new SugerenciaCorreo { Correo = correoAnterior, Disponible = true, EsReincorporacion = true };
+            }
         }
 
         var primeraLetra = primerNombre.Trim().Substring(0, 1).ToLower();
