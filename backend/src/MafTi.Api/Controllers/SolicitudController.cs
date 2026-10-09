@@ -87,6 +87,25 @@ public class SolicitudController : ControllerBase
 
         if (s == null) return NotFound();
 
+        SolicitudBloqueoDetalleDto? bloqueo = null;
+        if (s.Tipo == "Bloqueo")
+        {
+            bloqueo = await _context.SolicitudesBloqueo
+                .Where(b => b.SolicitudId == s.Id)
+                .Select(b => new SolicitudBloqueoDetalleDto
+                {
+                    Id = b.Id,
+                    SolicitudId = b.SolicitudId,
+                    EsTemporal = b.EsTemporal,
+                    FechaInicio = b.FechaInicio,
+                    FechaFin = b.FechaFin,
+                    Justificacion = b.Justificacion,
+                    TienePc = b.TienePc,
+                    CasillaOpera = b.CasillaOpera
+                })
+                .FirstOrDefaultAsync();
+        }
+
         return new SolicitudDetalleDto
         {
             Id = s.Id,
@@ -99,7 +118,8 @@ public class SolicitudController : ControllerBase
             MotivoRechazo = s.MotivoRechazo,
             SolicitudOrigenId = s.SolicitudOrigenId,
             FechaCreacion = s.FechaCreacion,
-            FechaVencimientoSLA = s.FechaVencimientoSLA
+            FechaVencimientoSLA = s.FechaVencimientoSLA,
+            Bloqueo = bloqueo
         };
     }
 
@@ -182,6 +202,91 @@ public class SolicitudController : ControllerBase
         
                
             
+    }
+
+    [HttpPost("bloqueo")]
+    [RequierePermiso("CrearSolicitudBloqueo")]
+    public async Task<ActionResult<SolicitudBloqueoResultadoDto>> CrearBloqueo(SolicitudBloqueoCreateDto dto)
+    {
+        var ahora = DateTime.UtcNow;
+        var desde = AUtc(dto.Desde);
+        var hasta = AUtc(dto.Hasta);
+
+        using var transaccion = await _context.Database.BeginTransactionAsync();
+
+        var trabajadorActivo = await _context.Trabajadores
+            .AnyAsync(t => t.Id == dto.TrabajadorId && t.Activo);
+        if (!trabajadorActivo)
+        {
+            return BadRequest(new { errores = new List<string> { "El trabajador no existe o no está activo." } });
+        }
+
+        var tieneBloqueoAbierto = await _context.Solicitudes
+            .AnyAsync(s => s.TrabajadorId == dto.TrabajadorId && s.Tipo == "Bloqueo"
+                && (s.Estado == "Pendiente" || s.Estado == "En proceso"));
+        if (tieneBloqueoAbierto)
+        {
+            return BadRequest(new { errores = new List<string> { "El trabajador ya tiene una solicitud de bloqueo pendiente o en proceso." } });
+        }
+
+        var errores = SolicitudBloqueoValidator.Validar(dto.EsTemporal, desde, hasta, dto.Justificacion, ahora);
+        if (errores.Any())
+        {
+            return BadRequest(new { errores });
+        }
+
+        var nuevaSolicitud = new Solicitud
+        {
+            TrabajadorId = dto.TrabajadorId,
+            CreadoPorId = dto.CreadoPorId,
+            Tipo = "Bloqueo",
+            Estado = "Pendiente",
+            FechaCreacion = ahora,
+            FechaVencimientoSLA = ahora.AddDays(4)
+        };
+
+        _context.Solicitudes.Add(nuevaSolicitud);
+        await _context.SaveChangesAsync();
+
+        _context.SolicitudesBloqueo.Add(new SolicitudBloqueo
+        {
+            SolicitudId = nuevaSolicitud.Id,
+            EsTemporal = dto.EsTemporal,
+            FechaInicio = dto.EsTemporal ? desde!.Value : ahora,
+            FechaFin = dto.EsTemporal ? hasta : null,
+            Justificacion = dto.Justificacion.Trim(),
+            TienePc = dto.TienePc,
+            CasillaOpera = dto.CasillaOpera
+        });
+
+        _context.HistorialSolicitudes.Add(new HistorialSolicitud
+        {
+            SolicitudId = nuevaSolicitud.Id,
+            Accion = "Creada",
+            RealizadoPorId = dto.CreadoPorId,
+            Fecha = ahora
+        });
+
+        await _context.SaveChangesAsync();
+        await transaccion.CommitAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = nuevaSolicitud.Id }, new SolicitudBloqueoResultadoDto
+        {
+            SolicitudId = nuevaSolicitud.Id,
+            FechaVencimientoSLA = nuevaSolicitud.FechaVencimientoSLA
+        });
+    }
+
+    // Npgsql exige Kind=Utc en columnas timestamptz; si el cliente no envía zona, se asume UTC.
+    private static DateTime? AUtc(DateTime? fecha)
+    {
+        if (fecha == null) return null;
+        return fecha.Value.Kind switch
+        {
+            DateTimeKind.Utc => fecha.Value,
+            DateTimeKind.Local => fecha.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(fecha.Value, DateTimeKind.Utc)
+        };
     }
 
     [HttpPost]
