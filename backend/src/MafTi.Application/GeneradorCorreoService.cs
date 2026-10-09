@@ -28,8 +28,8 @@ public static class GeneradorCorreoService
             }
         }
 
-        var primeraLetra = primerNombre.Trim().Substring(0, 1).ToLower();
-        var apellidoPaterno = primerApellido.Trim().ToLower().Replace(" ", "");
+        var primeraLetra = NormalizadorTexto.SinTildes(primerNombre.Trim().Substring(0, 1));
+        var apellidoPaterno = NormalizadorTexto.SinTildes(primerApellido.Trim()).Replace(" ", "");
 
         // Nivel 1: primera letra + apellido paterno completo
         var nivel1 = $"{primeraLetra}{apellidoPaterno}@mafchile.com";
@@ -41,7 +41,7 @@ public static class GeneradorCorreoService
         // Nivel 2: + primera letra del apellido materno, si existe
         if (!string.IsNullOrWhiteSpace(segundoApellido))
         {
-            var letraMaterno = segundoApellido.Trim().Substring(0, 1).ToLower();
+            var letraMaterno = NormalizadorTexto.SinTildes(segundoApellido.Trim().Substring(0, 1));
             var nivel2 = $"{primeraLetra}{apellidoPaterno}{letraMaterno}@mafchile.com";
             if (!await correoYaExisteAsync(nivel2))
             {

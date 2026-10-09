@@ -67,27 +67,14 @@ public static class TrabajadorValidator
         else
         {
             var localPart = correo.Substring(0, correo.Length - "@mafchile.com".Length);
-            var primeraLetra = trabajador.PrimerNombre.Trim().Substring(0, 1).ToLower();
-            var apellido = trabajador.PrimerApellido.Trim().ToLower().Replace(" ", "");
+            var primeraLetra = NormalizadorTexto.SinTildes(trabajador.PrimerNombre.Trim().Substring(0, 1));
+            var apellido = NormalizadorTexto.SinTildes(trabajador.PrimerApellido.Trim()).Replace(" ", "");
 
             if (localPart.Length > 30)
             {
                 errores.Add("El correo no puede tener más de 30 letras antes del @.");
             }
             else if (!System.Text.RegularExpressions.Regex.IsMatch(localPart, "^[a-z]+$"))
-            {
-                errores.Add("El correo solo puede contener letras, sin números ni símbolos.");
-            }
-            else if (!localPart.StartsWith($"{primeraLetra}{apellido}"))
-            {
-                errores.Add("El correo debe comenzar con la primera letra del nombre seguida del apellido paterno.");
-            }
-            else if (await correoYaExisteAsync(correo))
-            {
-                errores.Add("Ese correo ya está en uso por otro trabajador.");
-            }
-
-            if (!System.Text.RegularExpressions.Regex.IsMatch(localPart, "^[a-z]+$"))
             {
                 errores.Add("El correo solo puede contener letras, sin números ni símbolos.");
             }
