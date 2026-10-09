@@ -188,6 +188,14 @@ public class SolicitudController : ControllerBase
                 CatalogoId = catalogoId
             });
         }
+
+        _context.HistorialSolicitudes.Add(new HistorialSolicitud
+        {
+            SolicitudId = nuevaSolicitud.Id,
+            Accion = "Creada",
+            RealizadoPorId = dto.CreadoPorId,
+            Fecha = nuevaSolicitud.FechaCreacion
+        });
         
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
@@ -242,7 +250,8 @@ public class SolicitudController : ControllerBase
             Tipo = "Bloqueo",
             Estado = "Pendiente",
             FechaCreacion = ahora,
-            FechaVencimientoSLA = ahora.AddDays(4)
+            // TODO: SLA real en días hábiles considerando feriados; por ahora, fin del mismo día en hora de Chile.
+            FechaVencimientoSLA = HoraChile.FinDelDiaUtc(ahora)
         };
 
         _context.Solicitudes.Add(nuevaSolicitud);

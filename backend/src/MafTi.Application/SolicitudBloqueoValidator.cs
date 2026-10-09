@@ -4,18 +4,12 @@ namespace MafTi.Application;
 
 public static class SolicitudBloqueoValidator
 {
-    private static TimeZoneInfo ZonaChile()
-    {
-        try { return TimeZoneInfo.FindSystemTimeZoneById("America/Santiago"); }
-        catch { return TimeZoneInfo.FindSystemTimeZoneById("Pacific SA Standard Time"); }
-    }
-
     public static List<string> Validar(
         bool esTemporal, DateTime? desdeUtc, DateTime? hastaUtc, string? justificacion, DateTime ahoraUtc)
     {
         var errores = new List<string>();
 
-        var ahoraChile = TimeZoneInfo.ConvertTimeFromUtc(ahoraUtc, ZonaChile());
+        var ahoraChile = TimeZoneInfo.ConvertTimeFromUtc(ahoraUtc, HoraChile.Zona());
         if (ahoraChile.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
             errores.Add("Las solicitudes de bloqueo solo se pueden enviar de lunes a viernes.");
 
