@@ -26,6 +26,7 @@ public class SolicitudDetalleDto
     public DateTime FechaCreacion { get; set; }
     public DateTime FechaVencimientoSLA { get; set; }
     public SolicitudBloqueoDetalleDto? Bloqueo { get; set; }
+    public SolicitudModificacionDetalleDto? Modificacion { get; set; }
 }
 
 public class SolicitudCreateDto
