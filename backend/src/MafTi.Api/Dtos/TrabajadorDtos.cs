@@ -89,3 +89,9 @@ public class TrabajadorFichaDto
     
 }
 }
+public class TrabajadorAccesoDto
+{
+    public int CatalogoId { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public string Tipo { get; set; } = string.Empty;
+}

@@ -45,6 +45,18 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     e.HasIndex(x => x.SolicitudId).IsUnique();
     e.Property(x => x.Justificacion).HasMaxLength(200).IsRequired();
 });
+
+    modelBuilder.Entity<SolicitudModificacion>(e =>
+{
+    e.HasOne(x => x.Solicitud).WithOne()
+        .HasForeignKey<SolicitudModificacion>(x => x.SolicitudId)
+        .OnDelete(DeleteBehavior.Restrict);
+    e.HasIndex(x => x.SolicitudId).IsUnique();
+    e.Property(x => x.Justificacion).HasMaxLength(200).IsRequired();
+});
+
+    modelBuilder.Entity<SolicitudDetalle>()
+        .Property(x => x.Accion).HasMaxLength(10).HasDefaultValue("Agregar");
 }
 
     public DbSet<Trabajador> Trabajadores { get; set; }
@@ -58,4 +70,5 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<Permiso> Permisos { get; set; }
     public DbSet<RolPermiso> RolPermisos { get; set; }
     public DbSet<SolicitudBloqueo> SolicitudesBloqueo => Set<SolicitudBloqueo>();
+    public DbSet<SolicitudModificacion> SolicitudesModificacion => Set<SolicitudModificacion>();
 }
