@@ -72,11 +72,16 @@ namespace MafTi.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("PadreId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Tipo")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("PadreId");
 
                     b.ToTable("Catalogos");
                 });
@@ -220,6 +225,45 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasIndex("TrabajadorId");
 
                     b.ToTable("Solicitudes");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.SolicitudBloqueo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool?>("CasillaOpera")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("EsTemporal")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("FechaFin")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaInicio")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Justificacion")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SolicitudId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("TienePc")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SolicitudId")
+                        .IsUnique();
+
+                    b.ToTable("SolicitudesBloqueo");
                 });
 
             modelBuilder.Entity("MafTi.Domain.SolicitudDetalle", b =>
@@ -390,6 +434,16 @@ namespace MafTi.Infrastructure.Migrations
                     b.Navigation("Trabajador");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.Catalogo", b =>
+                {
+                    b.HasOne("MafTi.Domain.Catalogo", "Padre")
+                        .WithMany()
+                        .HasForeignKey("PadreId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Padre");
+                });
+
             modelBuilder.Entity("MafTi.Domain.HistorialSolicitud", b =>
                 {
                     b.HasOne("MafTi.Domain.UsuarioSistema", "RealizadoPor")
@@ -451,6 +505,17 @@ namespace MafTi.Infrastructure.Migrations
                     b.Navigation("SolicitudOrigen");
 
                     b.Navigation("Trabajador");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.SolicitudBloqueo", b =>
+                {
+                    b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
+                        .WithOne()
+                        .HasForeignKey("MafTi.Domain.SolicitudBloqueo", "SolicitudId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Solicitud");
                 });
 
             modelBuilder.Entity("MafTi.Domain.SolicitudDetalle", b =>

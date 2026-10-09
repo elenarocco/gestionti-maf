@@ -203,9 +203,11 @@ public class TrabajadorController : ControllerBase
         
 
         var errores = await TrabajadorValidator.ValidarAsync(
-            nuevo,
-            async correo => await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo),
-            async rut => await _context.Trabajadores.AnyAsync(t => t.Rut == rut && t.Activo));
+        nuevo,
+        async correo => await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo),
+        async rut => await _context.Trabajadores.AnyAsync(t => t.Rut == rut && t.Activo),
+        async (areaId, direccionId) => await _context.Catalogos.AnyAsync(
+            c => c.Id == areaId && c.Tipo == "Area" && c.PadreId == direccionId));
 
         if (errores.Any())
         {

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MafTi.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+24a6187a424f37149ada3f3a9c23abfd78d6ef2c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+121f8e05b46e76342c3dee5e9e08581a986ad084")]
 [assembly: System.Reflection.AssemblyProductAttribute("MafTi.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MafTi.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
