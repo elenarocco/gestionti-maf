@@ -106,6 +106,52 @@ public class SolicitudController : ControllerBase
                 .FirstOrDefaultAsync();
         }
 
+        SolicitudModificacionDetalleDto? modificacion = null;
+        if (s.Tipo == "Modificación")
+        {
+            modificacion = await _context.SolicitudesModificacion
+                .Where(m => m.SolicitudId == s.Id)
+                .Select(m => new SolicitudModificacionDetalleDto
+                {
+                    Id = m.Id,
+                    SolicitudId = m.SolicitudId,
+                    Justificacion = m.Justificacion,
+                    PrimerNombre = m.PrimerNombre,
+                    SegundoNombre = m.SegundoNombre,
+                    PrimerApellido = m.PrimerApellido,
+                    SegundoApellido = m.SegundoApellido,
+                    FechaNacimiento = m.FechaNacimiento,
+                    Sexo = m.Sexo,
+                    Correo = m.Correo,
+                    DireccionCorporativaId = m.DireccionCorporativaId,
+                    AreaId = m.AreaId,
+                    CargoId = m.CargoId,
+                    LugarTrabajoId = m.LugarTrabajoId,
+                    FechaIncorporacion = m.FechaIncorporacion,
+                    DireccionDomicilio = m.DireccionDomicilio,
+                    JefeDirecto = m.JefeDirecto,
+                    HomologarAccesosDesde = m.HomologarAccesosDesde,
+                    TieneTelefonoCorporativo = m.TieneTelefonoCorporativo,
+                    SolicitaTelefono = m.SolicitaTelefono
+                })
+                .FirstOrDefaultAsync();
+
+            if (modificacion != null)
+            {
+                var accesos = await _context.SolicitudDetalles
+                    .Where(d => d.SolicitudId == s.Id)
+                    .Select(d => new { d.Accion, Acceso = new SolicitudModificacionAccesoDto
+                    {
+                        CatalogoId = d.CatalogoId,
+                        Nombre = d.Catalogo!.Nombre,
+                        Tipo = d.Catalogo.Tipo
+                    } })
+                    .ToListAsync();
+                modificacion.AccesosAgregar = accesos.Where(a => a.Accion == "Agregar").Select(a => a.Acceso).ToList();
+                modificacion.AccesosQuitar = accesos.Where(a => a.Accion == "Quitar").Select(a => a.Acceso).ToList();
+            }
+        }
+
         return new SolicitudDetalleDto
         {
             Id = s.Id,
@@ -119,7 +165,8 @@ public class SolicitudController : ControllerBase
             SolicitudOrigenId = s.SolicitudOrigenId,
             FechaCreacion = s.FechaCreacion,
             FechaVencimientoSLA = s.FechaVencimientoSLA,
-            Bloqueo = bloqueo
+            Bloqueo = bloqueo,
+            Modificacion = modificacion
         };
     }
 
@@ -285,6 +332,187 @@ public class SolicitudController : ControllerBase
             FechaVencimientoSLA = nuevaSolicitud.FechaVencimientoSLA
         });
     }
+
+    [HttpPost("modificacion")]
+    [RequierePermiso("CrearSolicitudModificacion")]
+    public async Task<ActionResult<SolicitudModificacionResultadoDto>> CrearModificacion(SolicitudModificacionCreateDto dto)
+    {
+        var ahora = DateTime.UtcNow;
+
+        using var transaccion = await _context.Database.BeginTransactionAsync();
+
+        var actual = await _context.Trabajadores
+            .FirstOrDefaultAsync(t => t.Id == dto.TrabajadorId && t.Activo);
+        if (actual == null)
+        {
+            return BadRequest(new { errores = new List<string> { "El trabajador no existe o no está activo." } });
+        }
+
+        var tieneModificacionAbierta = await _context.Solicitudes
+            .AnyAsync(s => s.TrabajadorId == dto.TrabajadorId && s.Tipo == "Modificación"
+                && (s.Estado == "Pendiente" || s.Estado == "En proceso"));
+        if (tieneModificacionAbierta)
+        {
+            return BadRequest(new { errores = new List<string> { "El trabajador ya tiene una solicitud de modificación pendiente o en proceso." } });
+        }
+
+        // Valores propuestos. El RUT no se modifica.
+        var propuesto = new Trabajador
+        {
+            Id = actual.Id,
+            Rut = actual.Rut,
+            PrimerNombre = FormatoNombre.Normalizar(dto.PrimerNombre)!,
+            SegundoNombre = FormatoNombre.Normalizar(dto.SegundoNombre),
+            PrimerApellido = FormatoNombre.Normalizar(dto.PrimerApellido)!,
+            SegundoApellido = FormatoNombre.Normalizar(dto.SegundoApellido),
+            FechaNacimiento = dto.FechaNacimiento,
+            Sexo = dto.Sexo,
+            Correo = dto.Correo.Trim().ToLower(),
+            DireccionCorporativaId = dto.DireccionCorporativaId,
+            AreaId = dto.AreaId,
+            CargoId = dto.CargoId,
+            LugarTrabajoId = dto.LugarTrabajoId,
+            FechaIncorporacion = dto.FechaIncorporacion,
+            DireccionDomicilio = string.IsNullOrWhiteSpace(dto.DireccionDomicilio) ? null : dto.DireccionDomicilio.Trim(),
+            JefeDirecto = string.IsNullOrWhiteSpace(dto.JefeDirecto) ? null : dto.JefeDirecto.Trim(),
+            HomologarAccesosDesde = string.IsNullOrWhiteSpace(dto.HomologarAccesosDesde) ? null : dto.HomologarAccesosDesde.Trim(),
+            TieneTelefonoCorporativo = dto.TieneTelefonoCorporativo,
+            SolicitaTelefono = dto.SolicitaTelefono
+        };
+
+        // Mismas reglas que Ingreso, excluyendo al propio trabajador en los chequeos de duplicados.
+        var errores = await TrabajadorValidator.ValidarAsync(
+            propuesto,
+            async correo => await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo && t.Id != actual.Id),
+            async rut => await _context.Trabajadores.AnyAsync(t => t.Rut == rut && t.Activo && t.Id != actual.Id),
+            async (areaId, direccionId) => await _context.Catalogos.AnyAsync(
+                c => c.Id == areaId && c.Tipo == "Area" && c.PadreId == direccionId));
+
+        errores.AddRange(JustificacionValidator.Validar(dto.Justificacion));
+
+        var agregar = dto.CatalogoIdsAgregar.Distinct().ToList();
+        var quitar = dto.CatalogoIdsQuitar.Distinct().ToList();
+
+        var accesosActivos = await _context.Accesos
+            .Where(a => a.TrabajadorId == actual.Id && a.Estado == "Activo")
+            .Select(a => a.CatalogoId)
+            .ToListAsync();
+
+        if (agregar.Intersect(quitar).Any())
+            errores.Add("Un mismo acceso no puede agregarse y quitarse en la misma solicitud.");
+
+        var validosParaAgregar = await _context.Catalogos
+            .Where(c => agregar.Contains(c.Id) && c.Activo && (c.Tipo == "Sistema" || c.Tipo == "Carpeta"))
+            .Select(c => c.Id)
+            .ToListAsync();
+        if (validosParaAgregar.Count != agregar.Count)
+            errores.Add("Uno o más accesos a agregar no son sistemas o carpetas válidos.");
+        if (agregar.Any(id => accesosActivos.Contains(id)))
+            errores.Add("Uno o más accesos a agregar ya están activos para el trabajador.");
+        if (quitar.Any(id => !accesosActivos.Contains(id)))
+            errores.Add("Uno o más accesos a quitar no están activos para el trabajador.");
+
+        var hayCambiosDeDatos =
+            propuesto.PrimerNombre != actual.PrimerNombre ||
+            !MismoTexto(propuesto.SegundoNombre, actual.SegundoNombre) ||
+            propuesto.PrimerApellido != actual.PrimerApellido ||
+            !MismoTexto(propuesto.SegundoApellido, actual.SegundoApellido) ||
+            propuesto.FechaNacimiento != actual.FechaNacimiento ||
+            propuesto.Sexo != actual.Sexo ||
+            propuesto.Correo != actual.Correo.Trim().ToLower() ||
+            propuesto.DireccionCorporativaId != actual.DireccionCorporativaId ||
+            propuesto.AreaId != actual.AreaId ||
+            propuesto.CargoId != actual.CargoId ||
+            propuesto.LugarTrabajoId != actual.LugarTrabajoId ||
+            propuesto.FechaIncorporacion != actual.FechaIncorporacion ||
+            !MismoTexto(propuesto.DireccionDomicilio, actual.DireccionDomicilio) ||
+            !MismoTexto(propuesto.JefeDirecto, actual.JefeDirecto) ||
+            !MismoTexto(propuesto.HomologarAccesosDesde, actual.HomologarAccesosDesde) ||
+            propuesto.TieneTelefonoCorporativo != actual.TieneTelefonoCorporativo ||
+            propuesto.SolicitaTelefono != actual.SolicitaTelefono;
+        if (!hayCambiosDeDatos && agregar.Count == 0 && quitar.Count == 0)
+            errores.Add("La solicitud no contiene cambios.");
+
+        if (errores.Any())
+        {
+            return BadRequest(new { errores });
+        }
+
+        var nuevaSolicitud = new Solicitud
+        {
+            TrabajadorId = actual.Id,
+            CreadoPorId = dto.CreadoPorId,
+            Tipo = "Modificación",
+            Estado = "Pendiente",
+            FechaCreacion = ahora,
+            FechaVencimientoSLA = ahora.AddDays(4)
+        };
+
+        _context.Solicitudes.Add(nuevaSolicitud);
+        await _context.SaveChangesAsync();
+
+        // TODO: aplicar estos valores y accesos al trabajador cuando la solicitud se complete.
+        _context.SolicitudesModificacion.Add(new SolicitudModificacion
+        {
+            SolicitudId = nuevaSolicitud.Id,
+            Justificacion = dto.Justificacion.Trim(),
+            PrimerNombre = propuesto.PrimerNombre,
+            SegundoNombre = propuesto.SegundoNombre,
+            PrimerApellido = propuesto.PrimerApellido,
+            SegundoApellido = propuesto.SegundoApellido,
+            FechaNacimiento = propuesto.FechaNacimiento,
+            Sexo = propuesto.Sexo,
+            Correo = propuesto.Correo,
+            DireccionCorporativaId = propuesto.DireccionCorporativaId,
+            AreaId = propuesto.AreaId,
+            CargoId = propuesto.CargoId,
+            LugarTrabajoId = propuesto.LugarTrabajoId,
+            FechaIncorporacion = propuesto.FechaIncorporacion,
+            DireccionDomicilio = propuesto.DireccionDomicilio,
+            JefeDirecto = propuesto.JefeDirecto,
+            HomologarAccesosDesde = propuesto.HomologarAccesosDesde,
+            TieneTelefonoCorporativo = propuesto.TieneTelefonoCorporativo,
+            SolicitaTelefono = propuesto.SolicitaTelefono
+        });
+
+        foreach (var catalogoId in agregar)
+        {
+            _context.SolicitudDetalles.Add(new SolicitudDetalle
+            {
+                SolicitudId = nuevaSolicitud.Id,
+                CatalogoId = catalogoId,
+                Accion = "Agregar"
+            });
+        }
+        foreach (var catalogoId in quitar)
+        {
+            _context.SolicitudDetalles.Add(new SolicitudDetalle
+            {
+                SolicitudId = nuevaSolicitud.Id,
+                CatalogoId = catalogoId,
+                Accion = "Quitar"
+            });
+        }
+
+        _context.HistorialSolicitudes.Add(new HistorialSolicitud
+        {
+            SolicitudId = nuevaSolicitud.Id,
+            Accion = "Creada",
+            RealizadoPorId = dto.CreadoPorId,
+            Fecha = ahora
+        });
+
+        await _context.SaveChangesAsync();
+        await transaccion.CommitAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = nuevaSolicitud.Id }, new SolicitudModificacionResultadoDto
+        {
+            SolicitudId = nuevaSolicitud.Id,
+            FechaVencimientoSLA = nuevaSolicitud.FechaVencimientoSLA
+        });
+    }
+
+    private static bool MismoTexto(string? a, string? b) => (a ?? "").Trim() == (b ?? "").Trim();
 
     // Npgsql exige Kind=Utc en columnas timestamptz; si el cliente no envía zona, se asume UTC.
     private static DateTime? AUtc(DateTime? fecha)

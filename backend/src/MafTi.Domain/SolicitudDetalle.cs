@@ -10,4 +10,5 @@ public class SolicitudDetalle
     public int CatalogoId { get; set; }
     [JsonIgnore]
     public Catalogo? Catalogo { get; set; }
+    public string Accion { get; set; } = "Agregar";   // "Agregar" | "Quitar"
 }

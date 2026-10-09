@@ -107,6 +107,24 @@ public class TrabajadorController : ControllerBase
         };
     }
 
+    [HttpGet("{id}/accesos")]
+    [RequierePermiso("ConsultarTrabajadoresYAccesos")]
+    public async Task<ActionResult<List<TrabajadorAccesoDto>>> GetAccesos(int id)
+    {
+        if (!await _context.Trabajadores.AnyAsync(t => t.Id == id)) return NotFound();
+
+        return await _context.Accesos
+            .Where(a => a.TrabajadorId == id && a.Estado == "Activo")
+            .OrderBy(a => a.Catalogo!.Tipo).ThenBy(a => a.Catalogo!.Nombre)
+            .Select(a => new TrabajadorAccesoDto
+            {
+                CatalogoId = a.CatalogoId,
+                Nombre = a.Catalogo!.Nombre,
+                Tipo = a.Catalogo.Tipo
+            })
+            .ToListAsync();
+    }
+
     [HttpGet("{id}")]
     [RequierePermiso("ConsultarTrabajadoresYAccesos")]
     public async Task<ActionResult<TrabajadorDetalleDto>> GetById(int id)
