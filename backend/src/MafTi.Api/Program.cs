@@ -3,6 +3,10 @@ using MafTi.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// El navegador envía "Auditoría" en X-Rol-Simulado como Latin-1; sin esto Kestrel rechaza la petición (400).
+builder.WebHost.ConfigureKestrel(o =>
+    o.RequestHeaderEncodingSelector = nombre => nombre == "X-Rol-Simulado" ? System.Text.Encoding.Latin1 : null);
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
