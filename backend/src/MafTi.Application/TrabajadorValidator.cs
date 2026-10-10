@@ -14,7 +14,12 @@ public static class TrabajadorValidator
     {
         var errores = new List<string>();
 
-        var rutLimpio = LimpiarRut(trabajador.Rut);
+        var faltaNombre = string.IsNullOrWhiteSpace(trabajador.PrimerNombre);
+        var faltaApellido = string.IsNullOrWhiteSpace(trabajador.PrimerApellido);
+        if (faltaNombre) errores.Add("El primer nombre es obligatorio.");
+        if (faltaApellido) errores.Add("El primer apellido es obligatorio.");
+
+        var rutLimpio = LimpiarRut(trabajador.Rut ?? "");
 
         if (rutLimpio.Length < 2)
         {
@@ -64,7 +69,8 @@ public static class TrabajadorValidator
         {
             errores.Add("El correo debe ser del dominio institucional (@mafchile.com).");
         }
-        else
+        // Sin nombre o apellido no se puede comparar el correo con la regla; ya se informó arriba.
+        else if (!faltaNombre && !faltaApellido)
         {
             var localPart = correo.Substring(0, correo.Length - "@mafchile.com".Length);
             var primeraLetra = NormalizadorTexto.SinTildes(trabajador.PrimerNombre.Trim().Substring(0, 1));

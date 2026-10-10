@@ -28,6 +28,12 @@ public static class GeneradorCorreoService
             }
         }
 
+        // Sin nombre o apellido no hay regla que aplicar: se deja para edición manual.
+        if (string.IsNullOrWhiteSpace(primerNombre) || string.IsNullOrWhiteSpace(primerApellido))
+        {
+            return new SugerenciaCorreo { Correo = null, Disponible = false };
+        }
+
         var primeraLetra = NormalizadorTexto.SinTildes(primerNombre.Trim().Substring(0, 1));
         var apellidoPaterno = NormalizadorTexto.SinTildes(primerApellido.Trim()).Replace(" ", "");
 
