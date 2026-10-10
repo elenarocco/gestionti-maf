@@ -174,6 +174,9 @@ public class SolicitudController : ControllerBase
     [RequierePermiso("CrearSolicitudIngreso")]
     public async Task<ActionResult<IngresoResultadoDto>> CrearIngreso(IngresoCreateDto dto)
     {
+        var creadoPorId = await UsuarioActualIdAsync();
+        if (creadoPorId == null) return SinUsuarioParaRol();
+
         var nuevoTrabajador = new Trabajador
         {
             Rut = TrabajadorValidator.FormatearParaGuardar(dto.Rut),
@@ -217,7 +220,7 @@ public class SolicitudController : ControllerBase
         var nuevaSolicitud = new Solicitud
         {
             TrabajadorId = nuevoTrabajador.Id,
-            CreadoPorId = dto.CreadoPorId,
+            CreadoPorId = creadoPorId.Value,
             Tipo = "Ingreso",
             Estado = "Pendiente",
             FechaCreacion = DateTime.UtcNow,
@@ -240,7 +243,7 @@ public class SolicitudController : ControllerBase
         {
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
-            RealizadoPorId = dto.CreadoPorId,
+            RealizadoPorId = creadoPorId.Value,
             Fecha = nuevaSolicitud.FechaCreacion
         });
         
@@ -263,6 +266,9 @@ public class SolicitudController : ControllerBase
     [RequierePermiso("CrearSolicitudBloqueo")]
     public async Task<ActionResult<SolicitudBloqueoResultadoDto>> CrearBloqueo(SolicitudBloqueoCreateDto dto)
     {
+        var creadoPorId = await UsuarioActualIdAsync();
+        if (creadoPorId == null) return SinUsuarioParaRol();
+
         var ahora = DateTime.UtcNow;
         var desde = AUtc(dto.Desde);
         var hasta = AUtc(dto.Hasta);
@@ -293,7 +299,7 @@ public class SolicitudController : ControllerBase
         var nuevaSolicitud = new Solicitud
         {
             TrabajadorId = dto.TrabajadorId,
-            CreadoPorId = dto.CreadoPorId,
+            CreadoPorId = creadoPorId.Value,
             Tipo = "Bloqueo",
             Estado = "Pendiente",
             FechaCreacion = ahora,
@@ -319,7 +325,7 @@ public class SolicitudController : ControllerBase
         {
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
-            RealizadoPorId = dto.CreadoPorId,
+            RealizadoPorId = creadoPorId.Value,
             Fecha = ahora
         });
 
@@ -337,6 +343,9 @@ public class SolicitudController : ControllerBase
     [RequierePermiso("CrearSolicitudModificacion")]
     public async Task<ActionResult<SolicitudModificacionResultadoDto>> CrearModificacion(SolicitudModificacionCreateDto dto)
     {
+        var creadoPorId = await UsuarioActualIdAsync();
+        if (creadoPorId == null) return SinUsuarioParaRol();
+
         var ahora = DateTime.UtcNow;
 
         using var transaccion = await _context.Database.BeginTransactionAsync();
@@ -441,7 +450,7 @@ public class SolicitudController : ControllerBase
         var nuevaSolicitud = new Solicitud
         {
             TrabajadorId = actual.Id,
-            CreadoPorId = dto.CreadoPorId,
+            CreadoPorId = creadoPorId.Value,
             Tipo = "Modificación",
             Estado = "Pendiente",
             FechaCreacion = ahora,
@@ -498,7 +507,7 @@ public class SolicitudController : ControllerBase
         {
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
-            RealizadoPorId = dto.CreadoPorId,
+            RealizadoPorId = creadoPorId.Value,
             Fecha = ahora
         });
 
@@ -513,6 +522,23 @@ public class SolicitudController : ControllerBase
     }
 
     private static bool MismoTexto(string? a, string? b) => (a ?? "").Trim() == (b ?? "").Trim();
+
+    // TEMPORAL hasta el login con AD: quien realiza la acción es el usuario activo del rol simulado,
+    // no el creadoPorId que envía el cliente.
+    private async Task<int?> UsuarioActualIdAsync()
+    {
+        var rolActual = Request.Headers["X-Rol-Simulado"].ToString();
+        return await _context.UsuariosSistema
+            .Where(u => u.Activo && u.Rol!.Nombre == rolActual)
+            .OrderBy(u => u.Id)
+            .Select(u => (int?)u.Id)
+            .FirstOrDefaultAsync();
+    }
+
+    private ObjectResult SinUsuarioParaRol() => StatusCode(403, new
+    {
+        error = $"No hay un usuario activo con el rol '{Request.Headers["X-Rol-Simulado"]}'."
+    });
 
     // Npgsql exige Kind=Utc en columnas timestamptz; si el cliente no envía zona, se asume UTC.
     private static DateTime? AUtc(DateTime? fecha)
