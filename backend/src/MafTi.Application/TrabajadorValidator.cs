@@ -19,7 +19,7 @@ public static class TrabajadorValidator
         if (faltaNombre) errores.Add("El primer nombre es obligatorio.");
         if (faltaApellido) errores.Add("El primer apellido es obligatorio.");
 
-        var rutLimpio = LimpiarRut(trabajador.Rut ?? "");
+        var rutLimpio = LimpiarRut(trabajador.Rut);
 
         if (rutLimpio.Length < 2)
         {
