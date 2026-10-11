@@ -529,6 +529,143 @@ public class SolicitudController : ControllerBase
         });
     }
 
+    // ---------- Cambios de estado ----------
+
+    [HttpPost("{id}/aprobar")]
+    [RequierePermiso("RevisarAprobarBloqueo")]
+    public Task<ActionResult<CambioEstadoResultadoDto>> Aprobar(int id) =>
+        CambiarEstadoAsync(id, s => TransicionSolicitud.ValidarAprobar(s.Tipo, s.Estado),
+            TransicionSolicitud.EnProceso, "Aprobada");
+
+    [HttpPost("{id}/iniciar")]
+    [RequierePermiso("MarcarCompletada")]
+    public Task<ActionResult<CambioEstadoResultadoDto>> Iniciar(int id) =>
+        CambiarEstadoAsync(id, s => TransicionSolicitud.ValidarIniciar(s.Tipo, s.Estado),
+            TransicionSolicitud.EnProceso, "Iniciada");
+
+    [HttpPost("{id}/rechazar")]
+    [RequierePermiso("RechazarSolicitud")]
+    public Task<ActionResult<CambioEstadoResultadoDto>> Rechazar(int id, RechazarSolicitudDto dto) =>
+        CambiarEstadoAsync(id, s => TransicionSolicitud.ValidarRechazar(s.Estado, dto.Motivo),
+            TransicionSolicitud.Rechazada, "Rechazada", dto.Motivo?.Trim(), AplicarRechazoAsync);
+
+    [HttpPost("{id}/completar")]
+    [RequierePermiso("MarcarCompletada")]
+    public Task<ActionResult<CambioEstadoResultadoDto>> Completar(int id) =>
+        CambiarEstadoAsync(id, s => TransicionSolicitud.ValidarCompletar(s.Estado),
+            TransicionSolicitud.Completada, "Completada", null, AplicarResultadoAsync);
+
+    // Valida la transición, aplica el efecto (si hay), cambia el estado y deja el paso en el historial,
+    // todo en una sola transacción.
+    private async Task<ActionResult<CambioEstadoResultadoDto>> CambiarEstadoAsync(
+        int id, Func<Solicitud, string?> validar, string nuevoEstado, string accion,
+        string? comentario = null, Func<Solicitud, DateTime, Task>? efecto = null)
+    {
+        var usuarioId = await UsuarioActualIdAsync();
+        if (usuarioId == null) return SinUsuarioParaRol();
+
+        using var transaccion = await _context.Database.BeginTransactionAsync();
+
+        var s = await _context.Solicitudes.Include(x => x.Trabajador).FirstOrDefaultAsync(x => x.Id == id);
+        if (s == null) return NotFound();
+
+        var error = validar(s);
+        if (error != null) return BadRequest(new { errores = new List<string> { error } });
+
+        var ahora = DateTime.UtcNow;
+        if (efecto != null) await efecto(s, ahora);
+
+        s.Estado = nuevoEstado;
+        if (nuevoEstado == TransicionSolicitud.Rechazada) s.MotivoRechazo = comentario;
+
+        _context.HistorialSolicitudes.Add(new HistorialSolicitud
+        {
+            SolicitudId = s.Id,
+            Accion = accion,
+            RealizadoPorId = usuarioId.Value,
+            Fecha = ahora,
+            Comentario = comentario
+        });
+
+        await _context.SaveChangesAsync();
+        await transaccion.CommitAsync();
+
+        return Ok(new CambioEstadoResultadoDto { SolicitudId = s.Id, Estado = s.Estado });
+    }
+
+    // Un Ingreso rechazado no debe dejar al trabajador como activo (se creó junto con la solicitud).
+    private Task AplicarRechazoAsync(Solicitud s, DateTime ahora)
+    {
+        if (s.Tipo == "Ingreso") s.Trabajador!.Activo = false;
+        return Task.CompletedTask;
+    }
+
+    // Lo que significa "completar" para cada tipo de solicitud.
+    private async Task AplicarResultadoAsync(Solicitud s, DateTime ahora)
+    {
+        var t = s.Trabajador!;
+        var accesosActivos = await _context.Accesos
+            .Where(a => a.TrabajadorId == t.Id && a.Estado == "Activo")
+            .ToListAsync();
+        var detalles = await _context.SolicitudDetalles.Where(d => d.SolicitudId == s.Id).ToListAsync();
+
+        void OtorgarAccesos()
+        {
+            foreach (var d in detalles.Where(d => d.Accion == "Agregar"))
+            {
+                if (accesosActivos.Any(a => a.CatalogoId == d.CatalogoId)) continue;
+                _context.Accesos.Add(new Acceso
+                {
+                    TrabajadorId = t.Id, CatalogoId = d.CatalogoId, SolicitudId = s.Id,
+                    FechaOtorgado = ahora, Estado = "Activo"
+                });
+            }
+        }
+
+        switch (s.Tipo)
+        {
+            case "Ingreso":
+                OtorgarAccesos();
+                break;
+
+            case "Modificación":
+                var m = await _context.SolicitudesModificacion.FirstAsync(x => x.SolicitudId == s.Id);
+                t.PrimerNombre = m.PrimerNombre;
+                t.SegundoNombre = m.SegundoNombre;
+                t.PrimerApellido = m.PrimerApellido;
+                t.SegundoApellido = m.SegundoApellido;
+                t.FechaNacimiento = m.FechaNacimiento;
+                t.Sexo = m.Sexo;
+                t.Correo = m.Correo;
+                t.DireccionCorporativaId = m.DireccionCorporativaId;
+                t.AreaId = m.AreaId;
+                t.CargoId = m.CargoId;
+                t.LugarTrabajoId = m.LugarTrabajoId;
+                t.FechaIncorporacion = m.FechaIncorporacion;
+                t.DireccionDomicilio = m.DireccionDomicilio;
+                t.JefeDirecto = m.JefeDirecto;
+                t.HomologarAccesosDesde = m.HomologarAccesosDesde;
+                t.TieneTelefonoCorporativo = m.TieneTelefonoCorporativo;
+                t.SolicitaTelefono = m.SolicitaTelefono;
+
+                OtorgarAccesos();
+                var quitar = detalles.Where(d => d.Accion == "Quitar").Select(d => d.CatalogoId).ToList();
+                foreach (var a in accesosActivos.Where(a => quitar.Contains(a.CatalogoId))) a.Estado = "Revocado";
+                break;
+
+            case "Bloqueo":
+                var b = await _context.SolicitudesBloqueo.FirstAsync(x => x.SolicitudId == s.Id);
+                // TODO: el bloqueo temporal no cambia al trabajador; falta reactivar/suspender según FechaInicio/FechaFin.
+                if (!b.EsTemporal)
+                {
+                    t.Activo = false;
+                    t.FechaSalida = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(ahora, HoraChile.Zona()));
+                    foreach (var a in accesosActivos) a.Estado = "Revocado";
+                }
+                break;
+        }
+    }
+
     private static bool MismoTexto(string? a, string? b) => (a ?? "").Trim() == (b ?? "").Trim();
 
     // Quien realiza la acción es el usuario actual (ver UsuarioActual), no el creadoPorId que envía el cliente.
