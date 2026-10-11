@@ -29,6 +29,17 @@ public class SolicitudDetalleDto
     public SolicitudModificacionDetalleDto? Modificacion { get; set; }
 }
 
+public class RechazarSolicitudDto
+{
+    public string Motivo { get; set; } = string.Empty;
+}
+
+public class CambioEstadoResultadoDto
+{
+    public int SolicitudId { get; set; }
+    public string Estado { get; set; } = string.Empty;
+}
+
 public class SolicitudCreateDto
 {
     public int TrabajadorId { get; set; }
