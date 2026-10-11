@@ -174,8 +174,48 @@ public class SolicitudController : ControllerBase
             FechaCreacion = s.FechaCreacion,
             FechaVencimientoSLA = s.FechaVencimientoSLA,
             Bloqueo = bloqueo,
-            Modificacion = modificacion
+            Modificacion = modificacion,
+            AreaNombre = await _context.Catalogos.Where(c => c.Id == s.Trabajador.AreaId).Select(c => c.Nombre).FirstAsync(),
+            AccesosSolicitados = await _context.SolicitudDetalles
+                .Where(d => d.SolicitudId == s.Id)
+                .OrderBy(d => d.Accion).ThenBy(d => d.Catalogo!.Nombre)
+                .Select(d => new SolicitudAccesoDto
+                {
+                    CatalogoId = d.CatalogoId, Nombre = d.Catalogo!.Nombre, Tipo = d.Catalogo.Tipo, Accion = d.Accion
+                })
+                .ToListAsync(),
+            Historial = await _context.HistorialSolicitudes
+                .Where(h => h.SolicitudId == s.Id)
+                .OrderBy(h => h.Fecha)
+                .Select(h => new HistorialSolicitudListaDto
+                {
+                    Id = h.Id, SolicitudId = h.SolicitudId, Accion = h.Accion,
+                    RealizadoPorCorreo = h.RealizadoPor!.Trabajador!.Correo, Fecha = h.Fecha, Comentario = h.Comentario
+                })
+                .ToListAsync(),
+            AccionesDisponibles = await AccionesDisponiblesAsync(s)
         };
+    }
+
+    // Mismas reglas que los endpoints de cambio de estado, para que el frontend solo muestre lo que se puede hacer.
+    private async Task<List<string>> AccionesDisponiblesAsync(Solicitud s)
+    {
+        var rol = UsuarioActual.Rol(Request);
+        var permisos = await _context.RolPermisos
+            .Where(rp => rp.Rol!.Nombre == rol)
+            .Select(rp => rp.Permiso!.Codigo)
+            .ToListAsync();
+
+        var acciones = new List<string>();
+        if (permisos.Contains("RevisarAprobarBloqueo") && TransicionSolicitud.ValidarAprobar(s.Tipo, s.Estado) == null)
+            acciones.Add("aprobar");
+        if (permisos.Contains("MarcarCompletada") && TransicionSolicitud.ValidarIniciar(s.Tipo, s.Estado) == null)
+            acciones.Add("iniciar");
+        if (permisos.Contains("RechazarSolicitud") && TransicionSolicitud.ValidarRechazar(s.Estado, "motivo") == null)
+            acciones.Add("rechazar");
+        if (permisos.Contains("MarcarCompletada") && TransicionSolicitud.ValidarCompletar(s.Estado) == null)
+            acciones.Add("completar");
+        return acciones;
     }
 
     [HttpPost("ingreso")]
