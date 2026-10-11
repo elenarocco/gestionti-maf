@@ -176,6 +176,7 @@ public class SolicitudController : ControllerBase
             Bloqueo = bloqueo,
             Modificacion = modificacion,
             AreaNombre = await _context.Catalogos.Where(c => c.Id == s.Trabajador.AreaId).Select(c => c.Nombre).FirstAsync(),
+            CorregidaPorId = await _context.Solicitudes.Where(x => x.SolicitudOrigenId == s.Id).Select(x => (int?)x.Id).FirstOrDefaultAsync(),
             AccesosSolicitados = await _context.SolicitudDetalles
                 .Where(d => d.SolicitudId == s.Id)
                 .OrderBy(d => d.Accion).ThenBy(d => d.Catalogo!.Nombre)
@@ -215,6 +216,11 @@ public class SolicitudController : ControllerBase
             acciones.Add("rechazar");
         if (permisos.Contains("MarcarCompletada") && TransicionSolicitud.ValidarCompletar(s.Estado) == null)
             acciones.Add("completar");
+        // Corregir = crear una solicitud nueva del mismo tipo, así que exige el permiso de creación de ese tipo.
+        if (s.Estado == TransicionSolicitud.Rechazada
+            && PermisoPorTipo.TryGetValue(s.Tipo, out var permisoCrear) && permisos.Contains(permisoCrear)
+            && !await _context.Solicitudes.AnyAsync(x => x.SolicitudOrigenId == s.Id))
+            acciones.Add("corregir");
         return acciones;
     }
 
@@ -251,11 +257,16 @@ public class SolicitudController : ControllerBase
 
         var errores = await TrabajadorValidator.ValidarAsync(
             nuevoTrabajador,
-            async correo => await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo),
+            // El correo de un registro inactivo de la misma persona (mismo RUT) se puede reutilizar: reincorporación.
+            async correo => await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo
+                && !(t.Rut == nuevoTrabajador.Rut && !t.Activo)),
             async rut => await _context.Trabajadores.AnyAsync(t => t.Rut == rut && t.Activo),
             async (areaId, direccionId) => await _context.Catalogos.AnyAsync(
                 c => c.Id == areaId && c.Tipo == "Area" && c.PadreId == direccionId));
-            
+
+        var errorOrigen = await ValidarOrigenAsync(dto.SolicitudOrigenId, "Ingreso", rut: nuevoTrabajador.Rut);
+        if (errorOrigen != null) errores.Add(errorOrigen);
+
         if (errores.Any())
         {
             return BadRequest(new { errores });
@@ -269,6 +280,7 @@ public class SolicitudController : ControllerBase
         {
             TrabajadorId = nuevoTrabajador.Id,
             CreadoPorId = creadoPorId.Value,
+            SolicitudOrigenId = dto.SolicitudOrigenId,
             Tipo = "Ingreso",
             Estado = "Pendiente",
             FechaCreacion = DateTime.UtcNow,
@@ -292,7 +304,8 @@ public class SolicitudController : ControllerBase
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
             RealizadoPorId = creadoPorId.Value,
-            Fecha = nuevaSolicitud.FechaCreacion
+            Fecha = nuevaSolicitud.FechaCreacion,
+            Comentario = ComentarioCorreccion(dto.SolicitudOrigenId)
         });
         
         await _context.SaveChangesAsync();
@@ -339,6 +352,8 @@ public class SolicitudController : ControllerBase
         }
 
         var errores = SolicitudBloqueoValidator.Validar(dto.EsTemporal, desde, hasta, dto.Justificacion, ahora);
+        var errorOrigen = await ValidarOrigenAsync(dto.SolicitudOrigenId, "Bloqueo", trabajadorId: dto.TrabajadorId);
+        if (errorOrigen != null) errores.Add(errorOrigen);
         if (errores.Any())
         {
             return BadRequest(new { errores });
@@ -348,6 +363,7 @@ public class SolicitudController : ControllerBase
         {
             TrabajadorId = dto.TrabajadorId,
             CreadoPorId = creadoPorId.Value,
+            SolicitudOrigenId = dto.SolicitudOrigenId,
             Tipo = "Bloqueo",
             Estado = "Pendiente",
             FechaCreacion = ahora,
@@ -374,7 +390,8 @@ public class SolicitudController : ControllerBase
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
             RealizadoPorId = creadoPorId.Value,
-            Fecha = ahora
+            Fecha = ahora,
+            Comentario = ComentarioCorreccion(dto.SolicitudOrigenId)
         });
 
         await _context.SaveChangesAsync();
@@ -490,6 +507,9 @@ public class SolicitudController : ControllerBase
         if (!hayCambiosDeDatos && agregar.Count == 0 && quitar.Count == 0)
             errores.Add("La solicitud no contiene cambios.");
 
+        var errorOrigen = await ValidarOrigenAsync(dto.SolicitudOrigenId, "Modificación", trabajadorId: actual.Id);
+        if (errorOrigen != null) errores.Add(errorOrigen);
+
         if (errores.Any())
         {
             return BadRequest(new { errores });
@@ -499,6 +519,7 @@ public class SolicitudController : ControllerBase
         {
             TrabajadorId = actual.Id,
             CreadoPorId = creadoPorId.Value,
+            SolicitudOrigenId = dto.SolicitudOrigenId,
             Tipo = "Modificación",
             Estado = "Pendiente",
             FechaCreacion = ahora,
@@ -556,7 +577,8 @@ public class SolicitudController : ControllerBase
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
             RealizadoPorId = creadoPorId.Value,
-            Fecha = ahora
+            Fecha = ahora,
+            Comentario = ComentarioCorreccion(dto.SolicitudOrigenId)
         });
 
         await _context.SaveChangesAsync();
@@ -705,6 +727,27 @@ public class SolicitudController : ControllerBase
                 break;
         }
     }
+
+    // ---------- Corrección de solicitudes rechazadas ----------
+
+    // La corrección es una solicitud nueva enlazada a la original (que sigue Rechazada, sin reabrirse).
+    // Para Ingreso se compara el RUT, porque cada Ingreso crea su propio registro de trabajador.
+    private async Task<string?> ValidarOrigenAsync(int? origenId, string tipo, int? trabajadorId = null, string? rut = null)
+    {
+        if (origenId == null) return null;
+
+        var origen = await _context.Solicitudes.Include(x => x.Trabajador).FirstOrDefaultAsync(x => x.Id == origenId);
+        if (origen == null) return "La solicitud a corregir no existe.";
+        if (origen.Tipo != tipo) return "La corrección debe ser del mismo tipo que la solicitud original.";
+        if (origen.Estado != TransicionSolicitud.Rechazada) return "Solo se puede corregir una solicitud Rechazada.";
+        if (trabajadorId.HasValue && origen.TrabajadorId != trabajadorId) return "La corrección debe ser para el mismo trabajador.";
+        if (rut != null && origen.Trabajador!.Rut != rut) return "La corrección debe ser para el mismo trabajador (mismo RUT).";
+        if (await _context.Solicitudes.AnyAsync(x => x.SolicitudOrigenId == origenId)) return "Esa solicitud ya fue corregida.";
+        return null;
+    }
+
+    private static string? ComentarioCorreccion(int? origenId) =>
+        origenId.HasValue ? $"Corrige la solicitud N° {origenId}" : null;
 
     private static bool MismoTexto(string? a, string? b) => (a ?? "").Trim() == (b ?? "").Trim();
 
