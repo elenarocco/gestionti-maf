@@ -523,17 +523,9 @@ public class SolicitudController : ControllerBase
 
     private static bool MismoTexto(string? a, string? b) => (a ?? "").Trim() == (b ?? "").Trim();
 
-    // TEMPORAL hasta el login con AD: quien realiza la acción es el usuario activo del rol simulado,
-    // no el creadoPorId que envía el cliente.
-    private async Task<int?> UsuarioActualIdAsync()
-    {
-        var rolActual = Request.Headers["X-Rol-Simulado"].ToString();
-        return await _context.UsuariosSistema
-            .Where(u => u.Activo && u.Rol!.Nombre == rolActual)
-            .OrderBy(u => u.Id)
-            .Select(u => (int?)u.Id)
-            .FirstOrDefaultAsync();
-    }
+    // Quien realiza la acción es el usuario actual (ver UsuarioActual), no el creadoPorId que envía el cliente.
+    private async Task<int?> UsuarioActualIdAsync() =>
+        (await UsuarioActual.ObtenerAsync(_context, Request))?.Id;
 
     private ObjectResult SinUsuarioParaRol() => StatusCode(403, new
     {
