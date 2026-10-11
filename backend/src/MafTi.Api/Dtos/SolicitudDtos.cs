@@ -27,6 +27,19 @@ public class SolicitudDetalleDto
     public DateTime FechaVencimientoSLA { get; set; }
     public SolicitudBloqueoDetalleDto? Bloqueo { get; set; }
     public SolicitudModificacionDetalleDto? Modificacion { get; set; }
+    public string AreaNombre { get; set; } = string.Empty;
+    public List<SolicitudAccesoDto> AccesosSolicitados { get; set; } = new();
+    public List<HistorialSolicitudListaDto> Historial { get; set; } = new();
+    // Acciones que el rol actual puede hacer ahora sobre la solicitud: "aprobar", "iniciar", "rechazar", "completar".
+    public List<string> AccionesDisponibles { get; set; } = new();
+}
+
+public class SolicitudAccesoDto
+{
+    public int CatalogoId { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public string Tipo { get; set; } = string.Empty;
+    public string Accion { get; set; } = string.Empty; // "Agregar" | "Quitar"
 }
 
 public class RechazarSolicitudDto
