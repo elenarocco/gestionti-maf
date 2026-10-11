@@ -28,6 +28,7 @@ public class SolicitudDetalleDto
     public SolicitudBloqueoDetalleDto? Bloqueo { get; set; }
     public SolicitudModificacionDetalleDto? Modificacion { get; set; }
     public string AreaNombre { get; set; } = string.Empty;
+    public int? CorregidaPorId { get; set; } // solicitud nueva que corrige a esta (si fue rechazada y corregida)
     public List<SolicitudAccesoDto> AccesosSolicitados { get; set; } = new();
     public List<HistorialSolicitudListaDto> Historial { get; set; } = new();
     // Acciones que el rol actual puede hacer ahora sobre la solicitud: "aprobar", "iniciar", "rechazar", "completar".
