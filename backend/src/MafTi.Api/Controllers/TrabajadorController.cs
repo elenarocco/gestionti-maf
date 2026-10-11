@@ -20,12 +20,40 @@ public class TrabajadorController : ControllerBase
         _context = context;
     }
 
+    // Área a la que está limitado el usuario actual (solo Jefatura tiene una); null = ve todas.
+    private async Task<int?> AreaRestringidaAsync() =>
+        (await UsuarioActual.ObtenerAsync(_context, Request))?.AreaId;
+
+    private ObjectResult FueraDeSuArea() =>
+        StatusCode(403, new { error = "Solo puedes consultar trabajadores de tu área." });
+
+    // null si puede ver al trabajador (o si no existe: eso lo responde cada endpoint con 404).
+    private async Task<ObjectResult?> VerificarAreaAsync(int trabajadorId)
+    {
+        var areaPropia = await AreaRestringidaAsync();
+        if (areaPropia == null) return null;
+
+        var areaTrabajador = await _context.Trabajadores
+            .Where(t => t.Id == trabajadorId)
+            .Select(t => (int?)t.AreaId)
+            .FirstOrDefaultAsync();
+
+        return areaTrabajador == null || areaTrabajador == areaPropia ? null : FueraDeSuArea();
+    }
+
     [HttpGet]
     [RequierePermiso("ConsultarTrabajadoresYAccesos")]
     public async Task<ActionResult<PaginacionResultado<TrabajadorListaDto>>> GetAll(
         int pagina = 1, int tamanoPagina = 20, string? q = null, int? areaId = null, bool? activo = null)
     {
         var query = _context.Trabajadores.AsQueryable();
+
+        var areaPropia = await AreaRestringidaAsync();
+        if (areaPropia.HasValue)
+        {
+            if (areaId.HasValue && areaId != areaPropia) return FueraDeSuArea();
+            query = query.Where(t => t.AreaId == areaPropia);
+        }
 
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -61,6 +89,8 @@ public class TrabajadorController : ControllerBase
     [RequierePermiso("ConsultarTrabajadoresYAccesos")]
     public async Task<ActionResult<TrabajadorFichaDto>> GetFicha(int id)
     {
+        if (await VerificarAreaAsync(id) is { } denegado) return denegado;
+
         var t = await _context.Trabajadores
             .Include(x => x.Area).Include(x => x.Cargo)
             .Include(x => x.DireccionCorporativa).Include(x => x.LugarTrabajo)
@@ -112,6 +142,7 @@ public class TrabajadorController : ControllerBase
     public async Task<ActionResult<List<TrabajadorAccesoDto>>> GetAccesos(int id)
     {
         if (!await _context.Trabajadores.AnyAsync(t => t.Id == id)) return NotFound();
+        if (await VerificarAreaAsync(id) is { } denegado) return denegado;
 
         return await _context.Accesos
             .Where(a => a.TrabajadorId == id && a.Estado == "Activo")
@@ -129,6 +160,8 @@ public class TrabajadorController : ControllerBase
     [RequierePermiso("ConsultarTrabajadoresYAccesos")]
     public async Task<ActionResult<TrabajadorDetalleDto>> GetById(int id)
     {
+        if (await VerificarAreaAsync(id) is { } denegado) return denegado;
+
         var t = await _context.Trabajadores.FindAsync(id);
         if (t == null) return NotFound();
 
