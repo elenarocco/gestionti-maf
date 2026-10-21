@@ -22,10 +22,12 @@ public class SolicitudesController : ControllerBase
     private const string PermisoAprobarBloqueo = "RevisarAprobarBloqueo"; // RRHH
 
     private readonly AppDbContext _context;
+    private readonly UsuarioActual _usuario;
 
-    public SolicitudesController(AppDbContext context)
+    public SolicitudesController(AppDbContext context, UsuarioActual usuario)
     {
         _context = context;
+        _usuario = usuario;
     }
 
     // ---------- Bandeja de TI ----------
@@ -160,8 +162,7 @@ public class SolicitudesController : ControllerBase
     [RequierePermiso(PermisoAprobarBloqueo)]
     public async Task<IActionResult> AprobarRrhh(int id)
     {
-        var usuarioId = SesionSimulada.UsuarioId(Request);
-        if (usuarioId == null) return FaltaUsuario();
+        var usuarioId = _usuario.Id;
 
         var s = await _context.Solicitudes.FirstOrDefaultAsync(x => x.Id == id);
         if (s == null) return NotFound(new { error = "La solicitud no existe." });
@@ -171,7 +172,7 @@ public class SolicitudesController : ControllerBase
         s.Estado = EnProceso;
         _context.HistorialSolicitudes.Add(new HistorialSolicitud
         {
-            SolicitudId = s.Id, Accion = "Aprobada por RRHH", RealizadoPorId = usuarioId.Value, Fecha = DateTime.UtcNow
+            SolicitudId = s.Id, Accion = "Aprobada por RRHH", RealizadoPorId = usuarioId, Fecha = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();
         return NoContent();
@@ -179,8 +180,7 @@ public class SolicitudesController : ControllerBase
 
     private async Task<IActionResult> EjecutarAccionTiAsync(int id, string accion, string? justificacion = null, bool soloVpn = false)
     {
-        var usuarioId = SesionSimulada.UsuarioId(Request);
-        if (usuarioId == null) return FaltaUsuario();
+        var usuarioId = _usuario.Id;
 
         var s = await _context.Solicitudes.FirstOrDefaultAsync(x => x.Id == id);
         if (s == null || (soloVpn && s.Tipo != TipoVpn)) return NotFound(new { error = "La solicitud no existe." });
@@ -205,7 +205,7 @@ public class SolicitudesController : ControllerBase
         {
             SolicitudId = s.Id,
             Accion = historial,
-            RealizadoPorId = usuarioId.Value,
+            RealizadoPorId = usuarioId,
             Fecha = ahora,
             Comentario = esRechazo ? s.MotivoRechazo : null
         });
@@ -220,10 +220,9 @@ public class SolicitudesController : ControllerBase
     public async Task<ActionResult<PaginaDto<MiSolicitudDto>>> Mias(
         string? tipo = null, string? estado = null, int pagina = 1, int tamano = 20)
     {
-        var usuarioId = SesionSimulada.UsuarioId(Request);
-        if (usuarioId == null) return FaltaUsuario();
+        var usuarioId = _usuario.Id;
 
-        var query = _context.Solicitudes.Where(s => s.CreadoPorId == usuarioId.Value);
+        var query = _context.Solicitudes.Where(s => s.CreadoPorId == usuarioId);
         if (!string.IsNullOrWhiteSpace(tipo))
         {
             var tipoDb = TipoADb(tipo);
@@ -283,9 +282,8 @@ public class SolicitudesController : ControllerBase
     [RequierePermiso(PermisoCrearVpn)]
     public async Task<ActionResult<CreadaDto>> CrearVpn(CrearSolicitudVpnDto dto)
     {
-        var usuarioId = SesionSimulada.UsuarioId(Request);
-        if (usuarioId == null) return FaltaUsuario();
-        if (!await _context.UsuariosSistema.AnyAsync(u => u.Id == usuarioId.Value && u.Activo))
+        var usuarioId = _usuario.Id;
+        if (!await _context.UsuariosSistema.AnyAsync(u => u.Id == usuarioId && u.Activo))
             return BadRequest(new { error = "El usuario que crea la solicitud no existe o no está activo." });
 
         var motivoValido = await _context.Catalogos
@@ -299,7 +297,7 @@ public class SolicitudesController : ControllerBase
         var solicitud = new Solicitud
         {
             TrabajadorId = null,
-            CreadoPorId = usuarioId.Value,
+            CreadoPorId = usuarioId,
             Tipo = TipoVpn,
             Estado = Pendiente,
             FechaCreacion = ahora,
@@ -313,7 +311,7 @@ public class SolicitudesController : ControllerBase
         // TODO: notificar a TI por correo. Por ahora la solicitud aparece en la Bandeja de TI.
         _context.HistorialSolicitudes.Add(new HistorialSolicitud
         {
-            SolicitudId = solicitud.Id, Accion = "Creada", RealizadoPorId = usuarioId.Value, Fecha = ahora
+            SolicitudId = solicitud.Id, Accion = "Creada", RealizadoPorId = usuarioId, Fecha = ahora
         });
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
@@ -321,20 +319,17 @@ public class SolicitudesController : ControllerBase
         return CreatedAtAction(nameof(DetalleVpn), new { id = solicitud.Id }, new CreadaDto { Id = solicitud.Id });
     }
 
-    // Para la ficha: lo ve la jefatura creadora o TI.
+    // Para la ficha: lo ve la jefatura creadora o TI (el middleware ya exigió sesión).
     [HttpGet("vpn/{id:int}")]
     public async Task<ActionResult<SolicitudVpnDetalleDto>> DetalleVpn(int id)
     {
-        var rol = SesionSimulada.Rol(Request);
-        if (string.IsNullOrEmpty(rol)) return Unauthorized("Falta el header X-Rol-Simulado (temporal, hasta tener login real).");
-        var usuarioId = SesionSimulada.UsuarioId(Request);
-        if (usuarioId == null) return FaltaUsuario();
+        var usuarioId = _usuario.Id;
 
         var s = await _context.Solicitudes.FirstOrDefaultAsync(x => x.Id == id && x.Tipo == TipoVpn);
         if (s == null) return NotFound(new { error = "La solicitud no existe." });
 
-        var esCreador = s.CreadoPorId == usuarioId.Value;
-        if (!esCreador && !await SesionSimulada.TienePermisoAsync(_context, rol, PermisoBandeja))
+        var esCreador = s.CreadoPorId == usuarioId;
+        if (!esCreador && !await _context.RolPermisos.AnyAsync(rp => rp.RolId == _usuario.RolId && rp.Permiso!.Codigo == PermisoBandeja))
             return StatusCode(403, new { error = "Solo quien creó la solicitud o TI pueden verla." });
 
         var vpn = await _context.SolicitudesVpn.Include(v => v.Motivo).FirstAsync(v => v.SolicitudId == s.Id);
@@ -358,12 +353,11 @@ public class SolicitudesController : ControllerBase
     [RequierePermiso(PermisoFichaVpn)]
     public async Task<IActionResult> CompletarFicha(int id, FichaVpnDto dto)
     {
-        var usuarioId = SesionSimulada.UsuarioId(Request);
-        if (usuarioId == null) return FaltaUsuario();
+        var usuarioId = _usuario.Id;
 
         var s = await _context.Solicitudes.FirstOrDefaultAsync(x => x.Id == id && x.Tipo == TipoVpn);
         if (s == null) return NotFound(new { error = "La solicitud no existe." });
-        if (s.CreadoPorId != usuarioId.Value)
+        if (s.CreadoPorId != usuarioId)
             return StatusCode(403, new { error = "Solo quien creó la solicitud puede completar la ficha." });
 
         var vpn = await _context.SolicitudesVpn.FirstAsync(v => v.SolicitudId == s.Id);
@@ -391,7 +385,7 @@ public class SolicitudesController : ControllerBase
 
         _context.HistorialSolicitudes.Add(new HistorialSolicitud
         {
-            SolicitudId = s.Id, Accion = "Ficha VPN completada", RealizadoPorId = usuarioId.Value, Fecha = DateTime.UtcNow
+            SolicitudId = s.Id, Accion = "Ficha VPN completada", RealizadoPorId = usuarioId, Fecha = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();
         return NoContent();
@@ -515,7 +509,4 @@ public class SolicitudesController : ControllerBase
             .Where(d => d.SolicitudId == solicitudId && d.Accion == accion)
             .Select(d => d.Catalogo!.Nombre)
             .ToListAsync();
-
-    private UnauthorizedObjectResult FaltaUsuario() =>
-        Unauthorized("Falta el header X-Usuario-Simulado (temporal, hasta tener login real).");
 }

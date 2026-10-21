@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MafTi.Api.Seguridad;
 
+// Exige que el rol del usuario de la sesión tenga el permiso indicado (tabla RolPermisos).
+// La sesión la resuelve UsuarioActualMiddleware desde el token.
 public class RequierePermisoAttribute : Attribute, IAsyncActionFilter
 {
     private readonly string _codigoPermiso;
@@ -16,24 +18,22 @@ public class RequierePermisoAttribute : Attribute, IAsyncActionFilter
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        var rolActual = context.HttpContext.Request.Headers["X-Rol-Simulado"].ToString();
+        var usuario = context.HttpContext.RequestServices.GetRequiredService<UsuarioActual>();
 
-        if (string.IsNullOrEmpty(rolActual))
+        if (!usuario.Autenticado)
         {
-            context.Result = new UnauthorizedObjectResult("Falta el header X-Rol-Simulado (temporal, hasta tener login real).");
+            context.Result = new UnauthorizedObjectResult(new { error = "Debes iniciar sesión." });
             return;
         }
 
         var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
 
         bool tienePermiso = await db.RolPermisos
-            .Include(rp => rp.Rol)
-            .Include(rp => rp.Permiso)
-            .AnyAsync(rp => rp.Rol!.Nombre == rolActual && rp.Permiso!.Codigo == _codigoPermiso);
+            .AnyAsync(rp => rp.RolId == usuario.RolId && rp.Permiso!.Codigo == _codigoPermiso);
 
         if (!tienePermiso)
         {
-            context.Result = new ObjectResult(new { error = $"El rol '{rolActual}' no tiene el permiso '{_codigoPermiso}'." })
+            context.Result = new ObjectResult(new { error = $"Tu rol '{usuario.Rol}' no tiene el permiso '{_codigoPermiso}'." })
             {
                 StatusCode = 403
             };

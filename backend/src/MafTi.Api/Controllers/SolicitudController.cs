@@ -13,10 +13,12 @@ namespace MafTi.Api.Controllers;
 public class SolicitudController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly UsuarioActual _usuario;
 
-    public SolicitudController(AppDbContext context)
+    public SolicitudController(AppDbContext context, UsuarioActual usuario)
     {
         _context = context;
+        _usuario = usuario;
     }
     private static readonly Dictionary<string, string> PermisoPorTipo = new()
 {
@@ -32,11 +34,8 @@ public class SolicitudController : ControllerBase
         int pagina = 1, int tamanoPagina = 20, string? tipo = null,
         string? estado = null, bool? urgente = null, DateTime? desde = null, DateTime? hasta = null)
     {
-        var rolActual = Request.Headers["X-Rol-Simulado"].ToString();
-
         bool veTodo = await _context.RolPermisos
-            .Include(rp => rp.Rol).Include(rp => rp.Permiso)
-            .AnyAsync(rp => rp.Rol!.Nombre == rolActual && rp.Permiso!.Codigo == "ConsultarTodasLasSolicitudes");
+            .AnyAsync(rp => rp.RolId == _usuario.RolId && rp.Permiso!.Codigo == "ConsultarTodasLasSolicitudes");
 
         var query = _context.Solicitudes.AsQueryable();
 
@@ -46,8 +45,7 @@ public class SolicitudController : ControllerBase
             foreach (var par in PermisoPorTipo)
             {
                 var tieneCreacion = await _context.RolPermisos
-                    .Include(rp => rp.Rol).Include(rp => rp.Permiso)
-                    .AnyAsync(rp => rp.Rol!.Nombre == rolActual && rp.Permiso!.Codigo == par.Value);
+                    .AnyAsync(rp => rp.RolId == _usuario.RolId && rp.Permiso!.Codigo == par.Value);
                 if (tieneCreacion) tiposPermitidos.Add(par.Key);
             }
             query = query.Where(s => tiposPermitidos.Contains(s.Tipo));
@@ -228,7 +226,7 @@ public class SolicitudController : ControllerBase
         var nuevaSolicitud = new Solicitud
         {
             TrabajadorId = nuevoTrabajador.Id,
-            CreadoPorId = dto.CreadoPorId,
+            CreadoPorId = _usuario.Id,
             Tipo = "Ingreso",
             Estado = "Pendiente",
             FechaCreacion = DateTime.UtcNow,
@@ -251,7 +249,7 @@ public class SolicitudController : ControllerBase
         {
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
-            RealizadoPorId = dto.CreadoPorId,
+            RealizadoPorId = _usuario.Id,
             Fecha = nuevaSolicitud.FechaCreacion
         });
         
@@ -304,7 +302,7 @@ public class SolicitudController : ControllerBase
         var nuevaSolicitud = new Solicitud
         {
             TrabajadorId = dto.TrabajadorId,
-            CreadoPorId = dto.CreadoPorId,
+            CreadoPorId = _usuario.Id,
             Tipo = "Bloqueo",
             Estado = "Pendiente",
             FechaCreacion = ahora,
@@ -330,7 +328,7 @@ public class SolicitudController : ControllerBase
         {
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
-            RealizadoPorId = dto.CreadoPorId,
+            RealizadoPorId = _usuario.Id,
             Fecha = ahora
         });
 
@@ -452,7 +450,7 @@ public class SolicitudController : ControllerBase
         var nuevaSolicitud = new Solicitud
         {
             TrabajadorId = actual.Id,
-            CreadoPorId = dto.CreadoPorId,
+            CreadoPorId = _usuario.Id,
             Tipo = "Modificación",
             Estado = "Pendiente",
             FechaCreacion = ahora,
@@ -509,7 +507,7 @@ public class SolicitudController : ControllerBase
         {
             SolicitudId = nuevaSolicitud.Id,
             Accion = "Creada",
-            RealizadoPorId = dto.CreadoPorId,
+            RealizadoPorId = _usuario.Id,
             Fecha = ahora
         });
 
@@ -543,7 +541,7 @@ public class SolicitudController : ControllerBase
         var nueva = new Solicitud
         {
             TrabajadorId = dto.TrabajadorId,
-            CreadoPorId = dto.CreadoPorId,
+            CreadoPorId = _usuario.Id,
             Tipo = dto.Tipo,
             Estado = "Pendiente",
             FechaCreacion = DateTime.UtcNow,

@@ -3,7 +3,6 @@ namespace MafTi.Api.Dtos;
 public class SolicitudModificacionCreateDto
 {
     public int TrabajadorId { get; set; }
-    public int CreadoPorId { get; set; }
     public string PrimerNombre { get; set; } = string.Empty;
     public string? SegundoNombre { get; set; }
     public string PrimerApellido { get; set; } = string.Empty;

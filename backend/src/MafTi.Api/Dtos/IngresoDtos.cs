@@ -20,7 +20,6 @@ public class IngresoCreateDto
     public string? HomologarAccesosDesde { get; set; }
     public bool TieneTelefonoCorporativo { get; set; }
     public bool SolicitaTelefono { get; set; }
-    public int CreadoPorId { get; set; }
     public List<int> CatalogoIds { get; set; } = new();
 }
 
