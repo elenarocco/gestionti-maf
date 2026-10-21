@@ -15,7 +15,7 @@ public class SolicitudListaDto
 public class SolicitudDetalleDto
 {
     public int Id { get; set; }
-    public int TrabajadorId { get; set; }
+    public int? TrabajadorId { get; set; }
     public string TrabajadorNombre { get; set; } = string.Empty;
     public int CreadoPorId { get; set; }
     public string CreadoPorCorreo { get; set; } = string.Empty;

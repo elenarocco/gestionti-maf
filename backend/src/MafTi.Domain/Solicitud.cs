@@ -3,7 +3,7 @@ namespace MafTi.Domain;
 public class Solicitud
 {
     public int Id { get; set; }
-    public int TrabajadorId { get; set; }
+    public int? TrabajadorId { get; set; }   // nulo en VPN: el proveedor aún no existe como trabajador
     public Trabajador? Trabajador { get; set; }
     public int CreadoPorId { get; set; }
     public UsuarioSistema? CreadoPor { get; set; }

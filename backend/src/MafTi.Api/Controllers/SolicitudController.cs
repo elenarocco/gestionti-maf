@@ -25,6 +25,7 @@ public class SolicitudController : ControllerBase
     { "Bloqueo", "CrearSolicitudBloqueo" },
     { "VPN", "SolicitarAccesoVPN" }
 };
+    private const string SinProveedor = "Proveedor por definir";
 
     [HttpGet]
     public async Task<ActionResult<PaginacionResultado<SolicitudListaDto>>> GetAll(
@@ -63,8 +64,15 @@ public class SolicitudController : ControllerBase
             .Select(s => new SolicitudListaDto
             {
                 Id = s.Id,
-                TrabajadorNombre = s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido,
-                AreaNombre = s.Trabajador!.Area!.Nombre,
+                // VPN no tiene trabajador: se muestra el proveedor de la ficha cuando ya existe.
+                TrabajadorNombre = s.TrabajadorId != null
+                    ? s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido
+                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
+                        .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault() ?? SinProveedor,
+                AreaNombre = s.TrabajadorId != null
+                    ? s.Trabajador!.Area!.Nombre
+                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Departamento != null)
+                        .Select(v => v.Departamento).FirstOrDefault() ?? "—",
                 Tipo = s.Tipo,
                 Estado = s.Estado,
                 FechaCreacion = s.FechaCreacion,
@@ -156,7 +164,10 @@ public class SolicitudController : ControllerBase
         {
             Id = s.Id,
             TrabajadorId = s.TrabajadorId,
-            TrabajadorNombre = s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido,
+            TrabajadorNombre = s.Trabajador != null
+                ? s.Trabajador.PrimerNombre + " " + s.Trabajador.PrimerApellido
+                : await _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
+                    .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefaultAsync() ?? SinProveedor,
             CreadoPorId = s.CreadoPorId,
             CreadoPorCorreo = s.CreadoPor!.Trabajador!.Correo,
             Tipo = s.Tipo,

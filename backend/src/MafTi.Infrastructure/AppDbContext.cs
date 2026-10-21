@@ -55,6 +55,34 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     e.Property(x => x.Justificacion).HasMaxLength(200).IsRequired();
 });
 
+    // TrabajadorId es opcional solo por VPN; se mantiene el borrado en cascada que ya tenía.
+    modelBuilder.Entity<Solicitud>()
+        .HasOne(s => s.Trabajador)
+        .WithMany()
+        .HasForeignKey(s => s.TrabajadorId)
+        .IsRequired(false)
+        .OnDelete(DeleteBehavior.Cascade);
+
+    modelBuilder.Entity<SolicitudVpn>(e =>
+{
+    e.HasOne(x => x.Solicitud).WithOne()
+        .HasForeignKey<SolicitudVpn>(x => x.SolicitudId)
+        .OnDelete(DeleteBehavior.Restrict);
+    e.HasIndex(x => x.SolicitudId).IsUnique();
+    e.HasOne(x => x.Motivo).WithMany()
+        .HasForeignKey(x => x.MotivoId)
+        .OnDelete(DeleteBehavior.Restrict);
+    e.Property(x => x.Rut).HasMaxLength(12);
+    e.Property(x => x.Cargo).HasMaxLength(100);
+    e.Property(x => x.Nombres).HasMaxLength(100);
+    e.Property(x => x.Apellidos).HasMaxLength(100);
+    e.Property(x => x.Departamento).HasMaxLength(100);
+    e.Property(x => x.UbicacionFisica).HasMaxLength(150);
+    e.Property(x => x.CompaniaExterna).HasMaxLength(150);
+    e.Property(x => x.CuentaCorreo).HasMaxLength(150);
+    e.Property(x => x.Justificacion).HasMaxLength(200);
+});
+
     modelBuilder.Entity<SolicitudDetalle>()
         .Property(x => x.Accion).HasMaxLength(10).HasDefaultValue("Agregar");
 }
@@ -71,4 +99,5 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<RolPermiso> RolPermisos { get; set; }
     public DbSet<SolicitudBloqueo> SolicitudesBloqueo => Set<SolicitudBloqueo>();
     public DbSet<SolicitudModificacion> SolicitudesModificacion => Set<SolicitudModificacion>();
+    public DbSet<SolicitudVpn> SolicitudesVpn => Set<SolicitudVpn>();
 }
