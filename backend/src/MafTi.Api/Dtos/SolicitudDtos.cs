@@ -32,6 +32,5 @@ public class SolicitudDetalleDto
 public class SolicitudCreateDto
 {
     public int TrabajadorId { get; set; }
-    public int CreadoPorId { get; set; }
     public string Tipo { get; set; } = string.Empty;
 }
