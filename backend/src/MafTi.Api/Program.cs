@@ -7,8 +7,15 @@ using MafTi.Infrastructure;
 var builder = WebApplication.CreateBuilder(args);
 var esDesarrollo = builder.Environment.IsDevelopment();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+// Los secretos no van en appsettings: en desarrollo vienen de user-secrets y en el servidor de
+// variables de entorno (ConnectionStrings__Default). Ver backend/CONFIGURACION.md.
+var conexion = builder.Configuration.GetConnectionString("Default");
+if (string.IsNullOrWhiteSpace(conexion))
+    throw new InvalidOperationException(
+        "Falta la cadena de conexión ConnectionStrings:Default. En desarrollo: dotnet user-secrets set \"ConnectionStrings:Default\" \"...\"; " +
+        "en el servidor: variable de entorno ConnectionStrings__Default. Ver backend/CONFIGURACION.md.");
+
+builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(conexion));
 
 // Autenticación: token de Microsoft Entra ID (sección AzureAd). En Development se acepta además
 // el token del login de desarrollo; fuera de Development ese esquema y su clave no se registran.

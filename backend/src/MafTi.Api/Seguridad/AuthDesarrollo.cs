@@ -11,7 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace MafTi.Api.Seguridad;
 
 // Login de desarrollo: SOLO se registra cuando el entorno es Development (ver Program.cs).
-// Emite un JWT firmado con una clave local (AuthDesarrollo:Clave en appsettings.Development.json)
+// Emite un JWT firmado con una clave local (AuthDesarrollo:Clave en user-secrets)
 // con los mismos claims que se usan con Entra ID: correo, rol, userId y areaId.
 public static class AuthDesarrollo
 {
@@ -24,7 +24,8 @@ public static class AuthDesarrollo
     {
         var clave = config["AuthDesarrollo:Clave"];
         if (string.IsNullOrWhiteSpace(clave) || clave.Length < 32)
-            throw new InvalidOperationException("Falta AuthDesarrollo:Clave (mínimo 32 caracteres) en appsettings.Development.json.");
+            throw new InvalidOperationException(
+                "Falta AuthDesarrollo:Clave (mínimo 32 caracteres). Configúrala con: dotnet user-secrets set \"AuthDesarrollo:Clave\" \"...\". Ver backend/CONFIGURACION.md.");
         return new SymmetricSecurityKey(Encoding.UTF8.GetBytes(clave));
     }
 
