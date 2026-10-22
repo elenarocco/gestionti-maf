@@ -154,6 +154,7 @@ public partial class SolicitudesController : ControllerBase
             FechaVencimientoSLA = s.FechaVencimientoSLA,
             Vencida = EstaVencida(s.Estado, s.FechaVencimientoSLA, DateTime.UtcNow),
             CreadoPorNombre = NombreDe(s.CreadoPor?.Trabajador),
+            TrabajadorId = s.TrabajadorId,
             TrabajadorNombre = s.Trabajador != null ? NombreDe(s.Trabajador)
                 : vpn?.Nombres != null ? $"{vpn.Nombres} {vpn.Apellidos}" : null,
             Detalle = await DetallePorTipoAsync(s),
