@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MafTi.Infrastructure;
 using MafTi.Domain;
+using MafTi.Api.Common;
 using MafTi.Api.Dtos;
 using MafTi.Api.Seguridad;
 using MafTi.Application;
@@ -464,6 +465,7 @@ public class SolicitudesController : ControllerBase
             var nombres = await _context.Catalogos.Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Nombre);
             return new()
             {
+                ["cambios"] = await CambiosModificacion.DeSolicitudAsync(_context, s),
                 ["justificacion"] = m.Justificacion,
                 ["primerNombre"] = m.PrimerNombre,
                 ["segundoNombre"] = m.SegundoNombre,

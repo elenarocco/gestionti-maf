@@ -21,6 +21,7 @@ public class IngresoCreateDto
     public bool TieneTelefonoCorporativo { get; set; }
     public bool SolicitaTelefono { get; set; }
     public List<int> CatalogoIds { get; set; } = new();
+    public int? SolicitudOrigenId { get; set; } // si corrige una solicitud rechazada
 }
 
 public class IngresoResultadoDto
