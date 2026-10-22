@@ -6,6 +6,7 @@ using MafTi.Domain;
 using MafTi.Api.Dtos;
 using MafTi.Api.Common;
 using MafTi.Api.Seguridad;
+using MafTi.Api.Reportes;
 
 namespace MafTi.Api.Controllers;
 
@@ -38,17 +39,16 @@ public class TrabajadorController : ControllerBase
         return areaTrabajador == null || areaTrabajador == areaPropia ? null : FueraDeSuArea();
     }
 
-    [HttpGet]
-    [RequierePermiso("ConsultarTrabajadoresYAccesos")]
-    public async Task<ActionResult<PaginacionResultado<TrabajadorListaDto>>> GetAll(
-        int pagina = 1, int tamanoPagina = 20, string? q = null, int? areaId = null, bool? activo = null)
+    // Filtros de la lista de trabajadores; los usan la pantalla y el reporte, así descargan lo mismo que se ve.
+    // null si la Jefatura pide un área que no es la suya.
+    private IQueryable<Trabajador>? Filtrar(string? q, int? areaId, bool? activo)
     {
         var query = _context.Trabajadores.AsQueryable();
 
         // Jefatura ("Mi equipo") solo ve a los trabajadores de su área.
         if (_usuario.AreaRestringida is int areaPropia)
         {
-            if (areaId.HasValue && areaId != areaPropia) return FueraDeSuArea();
+            if (areaId.HasValue && areaId != areaPropia) return null;
             query = query.Where(t => t.AreaId == areaPropia);
         }
 
@@ -63,6 +63,16 @@ public class TrabajadorController : ControllerBase
         }
         if (areaId.HasValue) query = query.Where(t => t.AreaId == areaId.Value);
         if (activo.HasValue) query = query.Where(t => t.Activo == activo.Value);
+        return query;
+    }
+
+    [HttpGet]
+    [RequierePermiso("ConsultarTrabajadoresYAccesos")]
+    public async Task<ActionResult<PaginacionResultado<TrabajadorListaDto>>> GetAll(
+        int pagina = 1, int tamanoPagina = 20, string? q = null, int? areaId = null, bool? activo = null)
+    {
+        var query = Filtrar(q, areaId, activo);
+        if (query == null) return FueraDeSuArea();
 
         var resultado = await query
             .OrderBy(t => t.PrimerApellido).ThenBy(t => t.PrimerNombre).ThenBy(t => t.Id)
@@ -80,6 +90,55 @@ public class TrabajadorController : ControllerBase
             .PaginarAsync(pagina, tamanoPagina);
 
         return Ok(resultado);
+    }
+
+    // Reporte de trabajadores (Excel o PDF) con los mismos filtros de la lista. Quedan fuera a propósito
+    // los datos personales que no hacen falta en un reporte: fecha de nacimiento, sexo y domicilio.
+    [HttpGet("exportar")]
+    [RequierePermiso("ConsultarTrabajadoresYAccesos")]
+    [RequierePermiso(DescargaReporte.Permiso)]
+    public async Task<IActionResult> Exportar(string formato, string? q = null, int? areaId = null, bool? activo = null)
+    {
+        if (DescargaReporte.LeerFormato(formato) is not FormatoReporte fmt) return DescargaReporte.FormatoInvalido(this);
+        var query = Filtrar(q, areaId, activo);
+        if (query == null) return FueraDeSuArea();
+
+        var filas = await query
+            .OrderBy(t => t.Area!.Nombre).ThenBy(t => t.PrimerApellido).ThenBy(t => t.PrimerNombre).ThenBy(t => t.Id)
+            .Take(Reporte.MaxFilas + 1)
+            .Select(t => new object?[]
+            {
+                t.Rut,
+                t.PrimerNombre + (t.SegundoNombre != null ? " " + t.SegundoNombre : ""),
+                t.PrimerApellido + (t.SegundoApellido != null ? " " + t.SegundoApellido : ""),
+                t.Correo, t.Area!.Nombre, t.Cargo!.Nombre, t.LugarTrabajo!.Nombre, t.JefeDirecto,
+                t.FechaIncorporacion, t.FechaSalida, t.Activo ? "Activo" : "Inactivo"
+            })
+            .ToListAsync();
+        if (filas.Count > Reporte.MaxFilas) return DescargaReporte.DemasiadasFilas(this);
+
+        var filtros = new List<string>();
+        var areaFiltro = areaId ?? _usuario.AreaRestringida;
+        if (areaFiltro.HasValue)
+            filtros.Add("Área: " + (await _context.Catalogos.Where(c => c.Id == areaFiltro).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "—"));
+        if (activo.HasValue) filtros.Add(activo.Value ? "Solo activos" : "Solo inactivos");
+        if (!string.IsNullOrWhiteSpace(q)) filtros.Add($"Búsqueda: \"{q.Trim()}\"");
+
+        var reporte = new Reporte
+        {
+            Titulo = "Trabajadores",
+            NombreArchivo = "trabajadores",
+            Columnas =
+            [
+                new("RUT", 1.1), new("Nombres", 1.4), new("Apellidos", 1.4), new("Correo", 2.2), new("Área", 1.4),
+                new("Cargo", 1.6), new("Lugar de trabajo", 1.2), new("Jefe directo", 1.1),
+                new("Incorporación", 1.25), new("Salida", 1.05), new("Estado", 0.8)
+            ],
+            Filas = filas,
+            Filtros = filtros.Count == 0 ? "ninguno" : string.Join(" · ", filtros),
+            GeneradoPor = _usuario.Nombre
+        };
+        return await DescargaReporte.EntregarAsync(this, _context, _usuario, reporte, fmt);
     }
 
     [HttpGet("{id}/ficha")]
