@@ -5,4 +5,7 @@
     <Project Path="src/MafTi.Domain/MafTi.Domain.csproj" />
     <Project Path="src/MafTi.Infrastructure/MafTi.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MafTi.Tests/MafTi.Tests.csproj" />
+  </Folder>
 </Solution>
