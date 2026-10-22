@@ -14,6 +14,13 @@ public class UsuarioActual
     public string Rol { get; private set; } = string.Empty;
     public int? AreaId { get; private set; }
 
+    public const string RolJefatura = "Jefatura";
+    private const int SinArea = 0;   // ningún área tiene Id 0: una Jefatura sin área asignada no ve datos de nadie
+
+    // Área a la que está limitado el usuario: solo Jefatura ve únicamente su área (trabajadores,
+    // solicitudes y dashboard). null = sin restricción (TI, RRHH, Auditoría, Super Admin).
+    public int? AreaRestringida => Rol == RolJefatura ? AreaId ?? SinArea : null;
+
     public void Establecer(int id, string correo, string nombre, int rolId, string rol, int? areaId)
     {
         Autenticado = true;

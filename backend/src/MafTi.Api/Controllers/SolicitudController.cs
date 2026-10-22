@@ -51,6 +51,10 @@ public class SolicitudController : ControllerBase
             query = query.Where(s => tiposPermitidos.Contains(s.Tipo));
         }
 
+        // Jefatura solo ve solicitudes de trabajadores de su área (y las VPN que creó, que no tienen trabajador).
+        if (_usuario.AreaRestringida is int areaPropia)
+            query = query.Where(s => s.Trabajador!.AreaId == areaPropia || s.CreadoPorId == _usuario.Id);
+
          if (!string.IsNullOrEmpty(tipo)) query = query.Where(s => s.Tipo == tipo);
          if (!string.IsNullOrEmpty(estado)) query = query.Where(s => s.Estado == estado);
          if (urgente == true) query = query.Where(s => s.Estado == "Pendiente" && s.FechaVencimientoSLA < DateTime.UtcNow);
@@ -92,6 +96,8 @@ public class SolicitudController : ControllerBase
              .FirstOrDefaultAsync(x => x.Id == id);
 
         if (s == null) return NotFound();
+        if (_usuario.AreaRestringida is int areaPropia && s.Trabajador?.AreaId != areaPropia && s.CreadoPorId != _usuario.Id)
+            return StatusCode(403, new { error = "Solo puedes consultar solicitudes de tu área." });
 
         SolicitudBloqueoDetalleDto? bloqueo = null;
         if (s.Tipo == "Bloqueo")

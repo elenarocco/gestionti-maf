@@ -2,6 +2,7 @@ namespace MafTi.Api.Dtos;
 
 public class ResumenDashboardDto
 {
+    public string Alcance { get; set; } = "Empresa completa"; // o el nombre del área, si el usuario está limitado a una
     public int DotacionActual { get; set; }
     public int IngresosDelMes { get; set; }
     public int BajasDelMes { get; set; }

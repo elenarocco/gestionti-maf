@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MafTi.Infrastructure;
 using MafTi.Api.Dtos;
+using MafTi.Api.Seguridad;
 
 namespace MafTi.Api.Controllers;
 
@@ -10,10 +11,12 @@ namespace MafTi.Api.Controllers;
 public class DashboardController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly UsuarioActual _usuario;
 
-    public DashboardController(AppDbContext context)
+    public DashboardController(AppDbContext context, UsuarioActual usuario)
     {
         _context = context;
+        _usuario = usuario;
     }
 
   [HttpGet("resumen")]
@@ -23,6 +26,17 @@ public async Task<ActionResult<ResumenDashboardDto>> GetResumen()
     var hoy = DateOnly.FromDateTime(ahora);
     var inicioMes = new DateOnly(hoy.Year, hoy.Month, 1);
 
+    // Jefatura solo ve los datos de su área; el resto de los roles, la empresa completa.
+    var trabajadores = _context.Trabajadores.AsQueryable();
+    var solicitudes = _context.Solicitudes.AsQueryable();
+    var alcance = "Empresa completa";
+    if (_usuario.AreaRestringida is int areaPropia)
+    {
+        trabajadores = trabajadores.Where(t => t.AreaId == areaPropia);
+        solicitudes = solicitudes.Where(s => s.Trabajador!.AreaId == areaPropia || s.CreadoPorId == _usuario.Id);
+        alcance = await _context.Catalogos.Where(c => c.Id == areaPropia).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "Sin área asignada";
+    }
+
     var movimientos = new List<MovimientoMesDto>();
     for (int i = 5; i >= 0; i--)
     {
@@ -31,12 +45,12 @@ public async Task<ActionResult<ResumenDashboardDto>> GetResumen()
         movimientos.Add(new MovimientoMesDto
         {
             Mes = mes.ToString("yyyy-MM-dd"),
-            Ingresos = await _context.Trabajadores.CountAsync(t => t.FechaIncorporacion >= mes && t.FechaIncorporacion < siguiente),
-            Bajas = await _context.Trabajadores.CountAsync(t => t.FechaSalida != null && t.FechaSalida >= mes && t.FechaSalida < siguiente)
+            Ingresos = await trabajadores.CountAsync(t => t.FechaIncorporacion >= mes && t.FechaIncorporacion < siguiente),
+            Bajas = await trabajadores.CountAsync(t => t.FechaSalida != null && t.FechaSalida >= mes && t.FechaSalida < siguiente)
         });
     }
 
-    var porTipo = await _context.Solicitudes
+    var porTipo = await solicitudes
         .Where(s => s.Estado == "Pendiente")
         .GroupBy(s => s.Tipo)
         .Select(g => new ResumenTipoDto { Tipo = g.Key, Cantidad = g.Count() })
@@ -44,11 +58,12 @@ public async Task<ActionResult<ResumenDashboardDto>> GetResumen()
 
     return new ResumenDashboardDto
     {
-        DotacionActual = await _context.Trabajadores.CountAsync(t => t.Activo),
+        Alcance = alcance,
+        DotacionActual = await trabajadores.CountAsync(t => t.Activo),
         IngresosDelMes = movimientos.Last().Ingresos,
         BajasDelMes = movimientos.Last().Bajas,
-        SolicitudesPendientes = await _context.Solicitudes.CountAsync(s => s.Estado == "Pendiente"),
-        SolicitudesUrgentes = await _context.Solicitudes.CountAsync(s => s.Estado == "Pendiente" && s.FechaVencimientoSLA < ahora),
+        SolicitudesPendientes = await solicitudes.CountAsync(s => s.Estado == "Pendiente"),
+        SolicitudesUrgentes = await solicitudes.CountAsync(s => s.Estado == "Pendiente" && s.FechaVencimientoSLA < ahora),
         PorTipo = porTipo,
         Movimientos = movimientos
     };
