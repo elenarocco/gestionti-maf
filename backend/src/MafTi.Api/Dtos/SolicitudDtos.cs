@@ -10,6 +10,9 @@ public class SolicitudListaDto
     public string Estado { get; set; } = string.Empty;
     public DateTime FechaCreacion { get; set; }
     public DateTime FechaVencimientoSLA { get; set; }
+    public int? TrabajadorId { get; set; }
+    public string? MotivoRechazo { get; set; }   // la justificación del rechazo, visible para quien la creó
+    public bool PuedeCorregir { get; set; }      // rechazada, creada por el usuario y aún sin corregir
 }
 
 public class SolicitudDetalleDto

@@ -9,6 +9,7 @@ public class SolicitudBloqueoCreateDto
     public string Justificacion { get; set; } = "";
     public bool? TienePc { get; set; }
     public bool? CasillaOpera { get; set; }
+    public int? SolicitudOrigenId { get; set; } // si corrige una solicitud rechazada
 }
 
 public class SolicitudBloqueoResultadoDto
