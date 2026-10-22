@@ -45,6 +45,8 @@ public class SolicitudModificacionDetalleDto
     public int Id { get; set; }
     public int SolicitudId { get; set; }
     public string Justificacion { get; set; } = string.Empty;
+    // Descripción de lo que cambia, ej. "Cargo: Analista → Jefe de Área"
+    public List<string> Cambios { get; set; } = new();
     public string PrimerNombre { get; set; } = string.Empty;
     public string? SegundoNombre { get; set; }
     public string PrimerApellido { get; set; } = string.Empty;

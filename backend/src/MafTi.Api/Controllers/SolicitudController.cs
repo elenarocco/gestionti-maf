@@ -157,6 +157,19 @@ public class SolicitudController : ControllerBase
                     .ToListAsync();
                 modificacion.AccesosAgregar = accesos.Where(a => a.Accion == "Agregar").Select(a => a.Acceso).ToList();
                 modificacion.AccesosQuitar = accesos.Where(a => a.Accion == "Quitar").Select(a => a.Acceso).ToList();
+
+                // Los cambios se guardan al crear la solicitud (comentario del paso "Creada").
+                // Solicitudes antiguas no los tienen: si no está completada, se calculan contra los datos actuales.
+                var comentarioCreada = await _context.HistorialSolicitudes
+                    .Where(h => h.SolicitudId == s.Id && h.Accion == "Creada")
+                    .Select(h => h.Comentario)
+                    .FirstOrDefaultAsync();
+                modificacion.Cambios = (comentarioCreada ?? "").Split('\n').Where(l => l.Contains(" → ")).ToList();
+                if (modificacion.Cambios.Count == 0 && s.Estado != TransicionSolicitud.Completada)
+                {
+                    var m = await _context.SolicitudesModificacion.FirstAsync(x => x.SolicitudId == s.Id);
+                    modificacion.Cambios = await DescribirCambiosAsync(s.Trabajador, PropuestoDesde(m));
+                }
             }
         }
 
@@ -578,7 +591,9 @@ public class SolicitudController : ControllerBase
             Accion = "Creada",
             RealizadoPorId = creadoPorId.Value,
             Fecha = ahora,
-            Comentario = ComentarioCorreccion(dto.SolicitudOrigenId)
+            // Una línea por dato: queda el "antes → después" aunque luego se complete y se sobrescriba el trabajador.
+            Comentario = UnirLineas(new[] { ComentarioCorreccion(dto.SolicitudOrigenId) }
+                .Concat(await DescribirCambiosAsync(actual, propuesto)))
         });
 
         await _context.SaveChangesAsync();
@@ -748,6 +763,65 @@ public class SolicitudController : ControllerBase
 
     private static string? ComentarioCorreccion(int? origenId) =>
         origenId.HasValue ? $"Corrige la solicitud N° {origenId}" : null;
+
+    // ---------- Descripción de los cambios de una Modificación ----------
+
+    // "Campo: antes → después" por cada dato que cambia (los catálogos se muestran por nombre).
+    private async Task<List<string>> DescribirCambiosAsync(Trabajador antes, Trabajador despues)
+    {
+        var ids = new[] { antes.DireccionCorporativaId, antes.AreaId, antes.CargoId, antes.LugarTrabajoId,
+                          despues.DireccionCorporativaId, despues.AreaId, despues.CargoId, despues.LugarTrabajoId };
+        var nombres = await _context.Catalogos.Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Nombre);
+        string Cat(int id) => nombres.GetValueOrDefault(id, id.ToString());
+        static string Fecha(DateOnly f) => f.ToString("dd-MM-yyyy");
+        static string SiNo(bool b) => b ? "Sí" : "No";
+
+        var cambios = new List<string>();
+        void Comparar(string campo, string? a, string? b, bool ignorarMayusculas = false)
+        {
+            var x = (a ?? "").Trim();
+            var y = (b ?? "").Trim();
+            if (!string.Equals(x, y, ignorarMayusculas ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                cambios.Add($"{campo}: {(x == "" ? "—" : x)} → {(y == "" ? "—" : y)}");
+        }
+
+        Comparar("Primer nombre", antes.PrimerNombre, despues.PrimerNombre);
+        Comparar("Segundo nombre", antes.SegundoNombre, despues.SegundoNombre);
+        Comparar("Primer apellido", antes.PrimerApellido, despues.PrimerApellido);
+        Comparar("Segundo apellido", antes.SegundoApellido, despues.SegundoApellido);
+        Comparar("Fecha de nacimiento", Fecha(antes.FechaNacimiento), Fecha(despues.FechaNacimiento));
+        Comparar("Sexo", antes.Sexo, despues.Sexo);
+        Comparar("Correo", antes.Correo, despues.Correo, ignorarMayusculas: true);
+        Comparar("Dirección corporativa", Cat(antes.DireccionCorporativaId), Cat(despues.DireccionCorporativaId));
+        Comparar("Área", Cat(antes.AreaId), Cat(despues.AreaId));
+        Comparar("Cargo", Cat(antes.CargoId), Cat(despues.CargoId));
+        Comparar("Lugar de trabajo", Cat(antes.LugarTrabajoId), Cat(despues.LugarTrabajoId));
+        Comparar("Fecha de incorporación", Fecha(antes.FechaIncorporacion), Fecha(despues.FechaIncorporacion));
+        Comparar("Dirección de domicilio", antes.DireccionDomicilio, despues.DireccionDomicilio);
+        Comparar("Jefe directo", antes.JefeDirecto, despues.JefeDirecto);
+        Comparar("Homologar accesos desde", antes.HomologarAccesosDesde, despues.HomologarAccesosDesde);
+        Comparar("Teléfono corporativo", SiNo(antes.TieneTelefonoCorporativo), SiNo(despues.TieneTelefonoCorporativo));
+        Comparar("Solicita teléfono", SiNo(antes.SolicitaTelefono), SiNo(despues.SolicitaTelefono));
+        return cambios;
+    }
+
+    private static Trabajador PropuestoDesde(SolicitudModificacion m) => new()
+    {
+        PrimerNombre = m.PrimerNombre, SegundoNombre = m.SegundoNombre,
+        PrimerApellido = m.PrimerApellido, SegundoApellido = m.SegundoApellido,
+        FechaNacimiento = m.FechaNacimiento, Sexo = m.Sexo, Correo = m.Correo,
+        DireccionCorporativaId = m.DireccionCorporativaId, AreaId = m.AreaId, CargoId = m.CargoId,
+        LugarTrabajoId = m.LugarTrabajoId, FechaIncorporacion = m.FechaIncorporacion,
+        DireccionDomicilio = m.DireccionDomicilio, JefeDirecto = m.JefeDirecto,
+        HomologarAccesosDesde = m.HomologarAccesosDesde,
+        TieneTelefonoCorporativo = m.TieneTelefonoCorporativo, SolicitaTelefono = m.SolicitaTelefono
+    };
+
+    private static string? UnirLineas(IEnumerable<string?> lineas)
+    {
+        var texto = string.Join("\n", lineas.Where(l => !string.IsNullOrWhiteSpace(l)));
+        return texto == "" ? null : texto;
+    }
 
     private static bool MismoTexto(string? a, string? b) => (a ?? "").Trim() == (b ?? "").Trim();
 
