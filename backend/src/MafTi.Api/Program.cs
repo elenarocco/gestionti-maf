@@ -31,6 +31,9 @@ var auth = builder.Services
             esDesarrollo && AuthDesarrollo.EsTokenDeDesarrollo(context)
                 ? AuthDesarrollo.Esquema
                 : JwtBearerDefaults.AuthenticationScheme);
+foreach (var clave in new[] { "TenantId", "ClientId", "Audience" })
+    if (string.IsNullOrWhiteSpace(builder.Configuration[$"AzureAd:{clave}"]))
+        throw new InvalidOperationException($"Falta AzureAd:{clave} (datos de la app en Entra ID, van en appsettings.json). Ver backend/CONFIGURACION.md.");
 auth.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
 if (esDesarrollo) auth.AgregarEsquema(builder.Configuration);
 
@@ -40,15 +43,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("PermitirAngular", policy =>
-    {
-        policy.WithOrigins("http://localhost:4200")
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+builder.AgregarSeguridadHttp();
 
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
@@ -59,7 +54,7 @@ using (var scope = app.Services.CreateScope())
     if (esDesarrollo)
         await AuthDesarrollo.SembrarUsuariosAsync(db, scope.ServiceProvider.GetRequiredService<ILogger<Program>>());
 }
-app.UseCors("PermitirAngular");
+app.UsarSeguridadHttp();
 
 if (app.Environment.IsDevelopment())
 {
@@ -68,35 +63,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseMiddleware<UsuarioActualMiddleware>();
 app.MapControllers();
 
 if (esDesarrollo) AuthDesarrollo.MapearEndpoints(app);
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
