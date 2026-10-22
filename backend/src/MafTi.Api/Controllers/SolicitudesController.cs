@@ -78,6 +78,9 @@ public partial class SolicitudesController : ControllerBase
                     ? s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido
                     : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
                         .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault(),
+                AreaNombre = s.TrabajadorId != null
+                    ? s.Trabajador!.Area!.Nombre
+                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id).Select(v => v.Departamento).FirstOrDefault(),
                 CreadoPorNombre = s.CreadoPor!.Trabajador!.PrimerNombre + " " + s.CreadoPor.Trabajador.PrimerApellido,
                 YaCorregida = _context.Solicitudes.Any(x => x.SolicitudOrigenId == s.Id),
                 Vpn = _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id)
@@ -98,6 +101,7 @@ public partial class SolicitudesController : ControllerBase
                 Tipo = TipoAApi(f.Tipo),
                 Estado = EstadoAApi(f.Estado),
                 TrabajadorNombre = f.TrabajadorNombre,
+                AreaNombre = f.AreaNombre,
                 CreadoPorNombre = f.CreadoPorNombre,
                 FechaCreacion = f.FechaCreacion,
                 FechaVencimientoSLA = f.FechaVencimientoSLA,
