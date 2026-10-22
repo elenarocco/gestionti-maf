@@ -67,3 +67,7 @@ desarrollo ni Swagger.
   distinta a la de desarrollo.
 - Agrega la URL real del frontend como redirect "Aplicación de página única (SPA)" en Entra ID.
 - En el frontend, `apiUrl` de `src/environments/environment.ts` debe apuntar a `https://<dominio de la API>/api`.
+- Los reportes en PDF usan una fuente del sistema: Arial en Windows; en Linux hay que instalar el paquete
+  `fonts-dejavu` (o `fonts-liberation`). Sin fuente, la descarga en PDF responde con un error que lo indica.
+- La librería de PDF (PDFsharp-MigraDoc) está fijada en 6.2.4, la última versión con licencia MIT: desde la
+  6.5.0 es AGPL. No actualizarla sin revisar la licencia.
