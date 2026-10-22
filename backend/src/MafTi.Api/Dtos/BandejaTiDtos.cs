@@ -17,6 +17,7 @@ public class SolicitudBandejaDto
     public string Tipo { get; set; } = string.Empty;
     public string Estado { get; set; } = string.Empty;
     public string? TrabajadorNombre { get; set; }
+    public string? AreaNombre { get; set; }           // área del trabajador; en VPN, el departamento de la ficha
     public string CreadoPorNombre { get; set; } = string.Empty;
     public DateTime FechaCreacion { get; set; }
     public DateTime FechaVencimientoSLA { get; set; }
