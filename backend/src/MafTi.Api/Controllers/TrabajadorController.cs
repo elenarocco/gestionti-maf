@@ -189,6 +189,7 @@ public class TrabajadorController : ControllerBase
     }
 
     [HttpGet("sugerir-correo")]
+    [RequierePermiso("CrearSolicitudIngreso", "CrearSolicitudModificacion")]
     public async Task<ActionResult<SugerenciaCorreo>> SugerirCorreo(string rut, string primerNombre, string primerApellido, string? segundoApellido = null)
     {
         var rutLimpio = TrabajadorValidator.LimpiarRut(rut);
@@ -220,51 +221,5 @@ public class TrabajadorController : ControllerBase
             valido = !existe,
             mensaje = existe ? "Ya existe un trabajador activo con ese RUT." : null
         });
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<TrabajadorDetalleDto>> Create(TrabajadorCreateDto dto)
-    {
-        var nuevo = new Trabajador
-        {
-            Rut = TrabajadorValidator.FormatearParaGuardar(dto.Rut),
-            PrimerNombre = dto.PrimerNombre,
-            SegundoNombre = dto.SegundoNombre,
-            PrimerApellido = dto.PrimerApellido,
-            SegundoApellido = dto.SegundoApellido,
-            FechaNacimiento = dto.FechaNacimiento,
-            Sexo = dto.Sexo,
-            Correo = dto.Correo,
-            DireccionCorporativaId = dto.DireccionCorporativaId,
-            AreaId = dto.AreaId,
-            CargoId = dto.CargoId,
-            LugarTrabajoId = dto.LugarTrabajoId,
-            EsCuentaGenerica = false,
-            FechaIncorporacion = dto.FechaIncorporacion,
-            DireccionDomicilio = dto.DireccionDomicilio,
-            JefeDirecto = dto.JefeDirecto,
-            HomologarAccesosDesde = dto.HomologarAccesosDesde,
-            TieneTelefonoCorporativo = dto.TieneTelefonoCorporativo,
-            SolicitaTelefono = dto.SolicitaTelefono,
-            Activo = true
-        };
-        
-
-        var errores = await TrabajadorValidator.ValidarAsync(
-        nuevo,
-        async correo => await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo),
-        async rut => await _context.Trabajadores.AnyAsync(t => t.Rut == rut && t.Activo),
-        async (areaId, direccionId) => await _context.Catalogos.AnyAsync(
-            c => c.Id == areaId && c.Tipo == "Area" && c.PadreId == direccionId));
-
-        if (errores.Any())
-        {
-            return BadRequest(new { errores });
-        }
-
-        _context.Trabajadores.Add(nuevo);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetById), new { id = nuevo.Id }, dto);
     }
 }

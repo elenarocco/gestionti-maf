@@ -3,12 +3,16 @@ using Microsoft.EntityFrameworkCore;
 using MafTi.Infrastructure;
 using MafTi.Domain;
 using MafTi.Api.Dtos;
+using MafTi.Api.Seguridad;
 using MafTi.Api.Common;
 
 namespace MafTi.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Solo lectura y solo para quien ve todas las solicitudes. El historial lo escriben los propios
+// endpoints de solicitudes; no se acepta escritura directa.
+[RequierePermiso("ConsultarTodasLasSolicitudes")]
 public class SolicitudDetalleController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -32,20 +36,5 @@ public class SolicitudDetalleController : ControllerBase
 
         var resultado = await query.PaginarAsync(pagina, tamanoPagina);
         return Ok(resultado);
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<SolicitudDetalleListaDto>> Create(SolicitudDetalleCreateDto dto)
-    {
-        var nuevo = new SolicitudDetalle
-        {
-            SolicitudId = dto.SolicitudId,
-            CatalogoId = dto.CatalogoId
-        };
-
-        _context.SolicitudDetalles.Add(nuevo);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetAll), new { id = nuevo.Id }, dto);
     }
 }

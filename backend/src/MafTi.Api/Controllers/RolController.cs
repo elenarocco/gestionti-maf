@@ -3,11 +3,15 @@ using Microsoft.EntityFrameworkCore;
 using MafTi.Infrastructure;
 using MafTi.Domain;
 using MafTi.Api.Dtos;
+using MafTi.Api.Seguridad;
 
 namespace MafTi.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Quien puede crear roles, asignar permisos o dar acceso a usuarios puede darse cualquier permiso:
+// solo Super Admin (AdministrarUsuariosYRoles).
+[RequierePermiso("AdministrarUsuariosYRoles")]
 public class RolController : ControllerBase
 {
     private readonly AppDbContext _context;
