@@ -3,12 +3,16 @@ using Microsoft.EntityFrameworkCore;
 using MafTi.Infrastructure;
 using MafTi.Domain;
 using MafTi.Api.Dtos;
+using MafTi.Api.Seguridad;
 using MafTi.Api.Common;
 
 namespace MafTi.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Solo lectura y solo para quien ve todas las solicitudes. El historial lo escriben los propios
+// endpoints de solicitudes; no se acepta escritura directa.
+[RequierePermiso("ConsultarTodasLasSolicitudes")]
 public class HistorialSolicitudController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -35,23 +39,5 @@ public class HistorialSolicitudController : ControllerBase
 
         var resultado = await query.PaginarAsync(pagina, tamanoPagina);
         return Ok(resultado);
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<HistorialSolicitudListaDto>> Create(HistorialSolicitudCreateDto dto)
-    {
-        var nuevo = new HistorialSolicitud
-        {
-            SolicitudId = dto.SolicitudId,
-            Accion = dto.Accion,
-            RealizadoPorId = dto.RealizadoPorId,
-            Fecha = DateTime.UtcNow,
-            Comentario = dto.Comentario
-        };
-
-        _context.HistorialSolicitudes.Add(nuevo);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetAll), new { id = nuevo.Id }, dto);
     }
 }

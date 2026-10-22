@@ -9,11 +9,12 @@ namespace MafTi.Api.Seguridad;
 // La sesión la resuelve UsuarioActualMiddleware desde el token.
 public class RequierePermisoAttribute : Attribute, IAsyncActionFilter
 {
-    private readonly string _codigoPermiso;
+    private readonly string[] _codigos;
 
-    public RequierePermisoAttribute(string codigoPermiso)
+    // Con varios códigos basta con que el rol tenga alguno.
+    public RequierePermisoAttribute(params string[] codigos)
     {
-        _codigoPermiso = codigoPermiso;
+        _codigos = codigos;
     }
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
@@ -29,11 +30,11 @@ public class RequierePermisoAttribute : Attribute, IAsyncActionFilter
         var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
 
         bool tienePermiso = await db.RolPermisos
-            .AnyAsync(rp => rp.RolId == usuario.RolId && rp.Permiso!.Codigo == _codigoPermiso);
+            .AnyAsync(rp => rp.RolId == usuario.RolId && _codigos.Contains(rp.Permiso!.Codigo));
 
         if (!tienePermiso)
         {
-            context.Result = new ObjectResult(new { error = $"Tu rol '{usuario.Rol}' no tiene el permiso '{_codigoPermiso}'." })
+            context.Result = new ObjectResult(new { error = $"Tu rol '{usuario.Rol}' no tiene el permiso '{string.Join("' o '", _codigos)}'." })
             {
                 StatusCode = 403
             };

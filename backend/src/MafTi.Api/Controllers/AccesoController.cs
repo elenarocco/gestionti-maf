@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MafTi.Infrastructure;
 using MafTi.Domain;
 using MafTi.Api.Dtos;
+using MafTi.Api.Seguridad;
 using MafTi.Api.Common;
 
 namespace MafTi.Api.Controllers;
@@ -12,16 +13,24 @@ namespace MafTi.Api.Controllers;
 public class AccesoController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly UsuarioActual _usuario;
 
-    public AccesoController(AppDbContext context)
+    public AccesoController(AppDbContext context, UsuarioActual usuario)
     {
         _context = context;
+        _usuario = usuario;
     }
 
+    // Los accesos se otorgan por medio de solicitudes; aquí solo se consultan (Jefatura, solo de su área).
     [HttpGet]
+    [RequierePermiso("ConsultarTrabajadoresYAccesos")]
     public async Task<ActionResult<PaginacionResultado<AccesoListaDto>>> GetAll(int pagina = 1, int tamanoPagina = 20)
     {
-        var query = _context.Accesos
+        var accesos = _context.Accesos.AsQueryable();
+        if (_usuario.AreaRestringida is int areaPropia)
+            accesos = accesos.Where(a => a.Trabajador!.AreaId == areaPropia);
+
+        var query = accesos
             .OrderByDescending(a => a.FechaOtorgado)
             .Select(a => new AccesoListaDto
             {
@@ -34,23 +43,5 @@ public class AccesoController : ControllerBase
 
         var resultado = await query.PaginarAsync(pagina, tamanoPagina);
         return Ok(resultado);
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<AccesoListaDto>> Create(AccesoCreateDto dto)
-    {
-        var nuevo = new Acceso
-        {
-            TrabajadorId = dto.TrabajadorId,
-            CatalogoId = dto.CatalogoId,
-            SolicitudId = dto.SolicitudId,
-            FechaOtorgado = DateTime.UtcNow,
-            Estado = "Activo"
-        };
-
-        _context.Accesos.Add(nuevo);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetAll), new { id = nuevo.Id }, dto);
     }
 }

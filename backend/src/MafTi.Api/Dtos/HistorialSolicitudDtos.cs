@@ -9,11 +9,3 @@ public class HistorialSolicitudListaDto
     public DateTime Fecha { get; set; }
     public string? Comentario { get; set; }
 }
-
-public class HistorialSolicitudCreateDto
-{
-    public int SolicitudId { get; set; }
-    public string Accion { get; set; } = string.Empty;
-    public int RealizadoPorId { get; set; }
-    public string? Comentario { get; set; }
-}

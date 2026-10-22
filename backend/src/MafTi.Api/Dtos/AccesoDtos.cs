@@ -8,10 +8,3 @@ public class AccesoListaDto
     public DateTime FechaOtorgado { get; set; }
     public string Estado { get; set; } = string.Empty;
 }
-
-public class AccesoCreateDto
-{
-    public int TrabajadorId { get; set; }
-    public int CatalogoId { get; set; }
-    public int? SolicitudId { get; set; }
-}
