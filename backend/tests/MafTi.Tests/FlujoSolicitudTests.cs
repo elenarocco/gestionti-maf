@@ -19,12 +19,35 @@ public class FlujoSolicitudTests
     }
 
     [Fact]
-    public void Bloqueo_pendiente_TI_solo_puede_rechazarlo_porque_lo_aprueba_RRHH()
+    public void El_Bloqueo_lo_crea_RRHH_ya_aprobado_y_nace_en_proceso()
     {
-        Assert.Equal(new[] { Rechazar }, Ti(TipoBloqueo, Pendiente));
-        Assert.True(PuedeAprobarRrhh(new Situacion(TipoBloqueo, Pendiente)));
-        Assert.False(PuedeAprobarRrhh(new Situacion(TipoBloqueo, EnProceso)));
-        Assert.False(PuedeAprobarRrhh(new Situacion(TipoIngreso, Pendiente)));
+        Assert.Equal(EnProceso, EstadoInicial(TipoBloqueo));
+        Assert.Equal(Pendiente, EstadoInicial(TipoIngreso));
+        Assert.Equal(Pendiente, EstadoInicial(TipoVpn));
+    }
+
+    [Fact]
+    public void Un_Bloqueo_pendiente_antiguo_TI_tambien_lo_puede_completar()
+    {
+        Assert.Equal(new[] { Completar, Rechazar }, Ti(TipoBloqueo, Pendiente));
+    }
+
+    [Fact]
+    public void El_creador_corrige_una_rechazada_una_sola_vez_y_solo_si_puede_crear_ese_tipo()
+    {
+        var rechazada = new Situacion(TipoModificacion, Rechazada);
+        Assert.Equal(new[] { Corregir }, AccionesCreador(rechazada, yaCorregida: false, puedeCrearEseTipo: true, puedeCompletarFichas: false));
+        Assert.Empty(AccionesCreador(rechazada, yaCorregida: true, puedeCrearEseTipo: true, puedeCompletarFichas: false));
+        Assert.Empty(AccionesCreador(rechazada, yaCorregida: false, puedeCrearEseTipo: false, puedeCompletarFichas: false));
+        Assert.Empty(AccionesCreador(new Situacion(TipoVpn, Rechazada), false, true, true));
+    }
+
+    [Fact]
+    public void El_creador_de_una_VPN_aprobada_completa_la_ficha_hasta_enviarla()
+    {
+        Assert.Equal(new[] { CompletarFichaVpn }, AccionesCreador(new Situacion(TipoVpn, Pendiente, true, false), false, true, true));
+        Assert.Empty(AccionesCreador(new Situacion(TipoVpn, Pendiente, false, false), false, true, true));
+        Assert.Empty(AccionesCreador(new Situacion(TipoVpn, Pendiente, true, false), false, true, puedeCompletarFichas: false));
     }
 
     [Theory]

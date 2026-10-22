@@ -21,6 +21,10 @@ public class SolicitudBandejaDto
     public DateTime FechaCreacion { get; set; }
     public DateTime FechaVencimientoSLA { get; set; }
     public bool Vencida { get; set; }
+    public int? TrabajadorId { get; set; }
+    public string? MotivoRechazo { get; set; }        // justificación del rechazo (la ve quien la creó)
+    public string? MotivoVpn { get; set; }            // solo VPN
+    public List<string> AccionesPermitidas { get; set; } = new();   // del creador: "corregir", "completarFicha"
 }
 
 public class HistorialItemDto
@@ -88,20 +92,6 @@ public class CreadaDto
     public int Id { get; set; }
 }
 
-public class MiSolicitudDto
-{
-    public int Id { get; set; }
-    public string Tipo { get; set; } = string.Empty;
-    public string Estado { get; set; } = string.Empty;
-    public DateTime FechaCreacion { get; set; }
-    public DateTime FechaVencimientoSLA { get; set; }
-    public bool Vencida { get; set; }
-    public string? MotivoNombre { get; set; }          // solo VPN
-    public bool FormularioHabilitado { get; set; }     // solo VPN
-    public string? MotivoRechazo { get; set; }
-    public bool FichaCompletada { get; set; }          // solo VPN
-}
-
 public class SolicitudVpnDetalleDto
 {
     public int Id { get; set; }
@@ -114,10 +104,4 @@ public class SolicitudVpnDetalleDto
     public DateTime? FechaEnvioProveedor { get; set; }
     public FichaVpnDto? Ficha { get; set; }
     public List<HistorialItemDto> Historial { get; set; } = new();
-}
-
-public class CatalogoOpcionDto
-{
-    public int Id { get; set; }
-    public string Nombre { get; set; } = string.Empty;
 }

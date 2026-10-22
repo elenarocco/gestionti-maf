@@ -11,6 +11,8 @@ public static class FlujoSolicitud
     public const string Rechazar = "rechazar";
     public const string ConfirmarEnvio = "confirmarEnvio";
     public const string RechazarFicha = "rechazarFicha";
+    public const string Corregir = "corregir";              // acción del creador: nueva solicitud enlazada
+    public const string CompletarFichaVpn = "completarFicha"; // acción del creador de una VPN aprobada
 
     public record Situacion(string Tipo, string Estado, bool FormularioHabilitado = false, bool FichaCompletada = false);
 
@@ -36,10 +38,17 @@ public static class FlujoSolicitud
             return acciones;
         }
 
+        // Bloqueo: RRHH lo crea ya aprobado (nace En proceso) y TI lo completa o lo rechaza.
+        // Un Bloqueo Pendiente creado antes de esta regla se trata igual.
+        if (s.Tipo == TipoBloqueo)
+        {
+            if (s.Estado == Pendiente || s.Estado == EnProceso) { acciones.Add(Completar); acciones.Add(Rechazar); }
+            return acciones;
+        }
+
         if (s.Estado == Pendiente)
         {
-            // Bloqueo lo aprueba RRHH, no TI; TI solo puede rechazarlo.
-            if (s.Tipo != TipoBloqueo) acciones.Add(Tomar);
+            acciones.Add(Tomar);
             acciones.Add(Rechazar);
         }
         else if (s.Estado == EnProceso)
@@ -50,8 +59,17 @@ public static class FlujoSolicitud
         return acciones;
     }
 
-    // RRHH aprueba un Bloqueo pendiente: pasa a EnProceso para que TI lo ejecute.
-    public static bool PuedeAprobarRrhh(Situacion s) => s.Tipo == TipoBloqueo && s.Estado == Pendiente;
+    // Estado con que nace cada solicitud: el Bloqueo lo crea RRHH ya aprobado.
+    public static string EstadoInicial(string tipo) => tipo == TipoBloqueo ? EnProceso : Pendiente;
+
+    // Acciones de quien creó la solicitud (se muestran en "Mis solicitudes" y en el detalle).
+    public static List<string> AccionesCreador(Situacion s, bool yaCorregida, bool puedeCrearEseTipo, bool puedeCompletarFichas)
+    {
+        var acciones = new List<string>();
+        if (s.Estado == Rechazada && s.Tipo != TipoVpn && !yaCorregida && puedeCrearEseTipo) acciones.Add(Corregir);
+        if (puedeCompletarFichas && PuedeCompletarFicha(s) && !s.FichaCompletada) acciones.Add(CompletarFichaVpn);
+        return acciones;
+    }
 
     // Jefatura creadora completa la ficha VPN solo si TI la habilitó y sigue Pendiente.
     public static bool PuedeCompletarFicha(Situacion s) =>

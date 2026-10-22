@@ -14,13 +14,13 @@ namespace MafTi.Api.Controllers;
 // MafTi.Application (FlujoSolicitud, SolicitudVpnValidator); el frontend solo muestra lo que recibe.
 [ApiController]
 [Route("api/solicitudes")]
-public class SolicitudesController : ControllerBase
+public partial class SolicitudesController : ControllerBase
 {
     private const string PermisoBandeja = "GestionarBandejaTI";          // solo Admin TI
     private const string PermisoCrearVpn = "SolicitarAccesoVPN";         // Jefatura
     private const string PermisoFichaVpn = "CompletarFichaVPN";          // + validación de creador
     private const string PermisoPropias = "ConsultarSolicitudesPropias"; // Jefatura, RRHH
-    private const string PermisoAprobarBloqueo = "RevisarAprobarBloqueo"; // RRHH
+    private const string PermisoVerTodas = "ConsultarTodasLasSolicitudes"; // Admin TI, Auditoría, Super Admin
 
     private readonly AppDbContext _context;
     private readonly UsuarioActual _usuario;
@@ -33,12 +33,19 @@ public class SolicitudesController : ControllerBase
 
     // ---------- Bandeja de TI ----------
 
+    // Una sola lista de solicitudes para todos los roles. El backend decide el alcance:
+    // quien puede ver todas (TI, Auditoría, Super Admin) las ve todas; el resto ve solo las que creó.
+    // estado = Pendiente | EnProceso | Completada | Rechazada | Abiertas (Pendiente y En proceso).
     [HttpGet]
-    [RequierePermiso(PermisoBandeja)]
     public async Task<ActionResult<PaginaDto<SolicitudBandejaDto>>> Listar(
         string? tipo = null, string? estado = null, int pagina = 1, int tamano = 20)
     {
+        var permisos = await PermisosDelRolAsync();
+        if (!PuedeVerSolicitudes(permisos))
+            return StatusCode(403, new { error = $"Tu rol '{_usuario.Rol}' no puede ver solicitudes." });
+
         var query = _context.Solicitudes.AsQueryable();
+        if (!VeTodas(permisos)) query = query.Where(s => s.CreadoPorId == _usuario.Id);
 
         if (!string.IsNullOrWhiteSpace(tipo))
         {
@@ -46,7 +53,9 @@ public class SolicitudesController : ControllerBase
             if (tipoDb == null) return BadRequest(new { error = "Tipo de solicitud no válido." });
             query = query.Where(s => s.Tipo == tipoDb);
         }
-        if (!string.IsNullOrWhiteSpace(estado))
+        if (string.Equals(estado?.Trim(), "Abiertas", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(s => s.Estado == Pendiente || s.Estado == EnProceso);
+        else if (!string.IsNullOrWhiteSpace(estado))
         {
             var estadoDb = EstadoADb(estado);
             if (estadoDb == null) return BadRequest(new { error = "Estado de solicitud no válido." });
@@ -63,13 +72,17 @@ public class SolicitudesController : ControllerBase
             .Take(tamano)
             .Select(s => new
             {
-                s.Id, s.Tipo, s.Estado, s.FechaCreacion, s.FechaVencimientoSLA,
+                s.Id, s.Tipo, s.Estado, s.FechaCreacion, s.FechaVencimientoSLA, s.TrabajadorId, s.CreadoPorId, s.MotivoRechazo,
                 // VPN no tiene trabajador: se muestra el proveedor de la ficha cuando ya existe.
                 TrabajadorNombre = s.TrabajadorId != null
                     ? s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido
                     : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
                         .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault(),
-                CreadoPorNombre = s.CreadoPor!.Trabajador!.PrimerNombre + " " + s.CreadoPor.Trabajador.PrimerApellido
+                CreadoPorNombre = s.CreadoPor!.Trabajador!.PrimerNombre + " " + s.CreadoPor.Trabajador.PrimerApellido,
+                YaCorregida = _context.Solicitudes.Any(x => x.SolicitudOrigenId == s.Id),
+                Vpn = _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id)
+                    .Select(v => new { MotivoNombre = v.Motivo!.Nombre, v.FormularioHabilitado, FichaCompletada = v.Nombres != null })
+                    .FirstOrDefault()
             })
             .ToListAsync();
 
@@ -88,15 +101,23 @@ public class SolicitudesController : ControllerBase
                 CreadoPorNombre = f.CreadoPorNombre,
                 FechaCreacion = f.FechaCreacion,
                 FechaVencimientoSLA = f.FechaVencimientoSLA,
-                Vencida = EstaVencida(f.Estado, f.FechaVencimientoSLA, ahora)
+                Vencida = EstaVencida(f.Estado, f.FechaVencimientoSLA, ahora),
+                TrabajadorId = f.TrabajadorId,
+                MotivoRechazo = f.MotivoRechazo,
+                MotivoVpn = f.Vpn?.MotivoNombre,
+                AccionesPermitidas = f.CreadoPorId != _usuario.Id ? new() : FlujoSolicitud.AccionesCreador(
+                    new FlujoSolicitud.Situacion(f.Tipo, f.Estado, f.Vpn?.FormularioHabilitado ?? false, f.Vpn?.FichaCompletada ?? false),
+                    f.YaCorregida, PuedeCrearTipo(permisos, f.Tipo), permisos.Contains(PermisoFichaVpn))
             }).ToList()
         };
     }
 
+    // Detalle con historial. Lo ve quien puede ver todas las solicitudes o quien la creó; las acciones
+    // de TI aparecen solo con el permiso de la Bandeja y las del creador solo a quien la creó.
     [HttpGet("{id:int}")]
-    [RequierePermiso(PermisoBandeja)]
     public async Task<ActionResult<SolicitudBandejaDetalleDto>> Detalle(int id)
     {
+        var permisos = await PermisosDelRolAsync();
         var s = await _context.Solicitudes
             .Include(x => x.Trabajador).ThenInclude(t => t!.Area)
             .Include(x => x.Trabajador).ThenInclude(t => t!.Cargo)
@@ -105,10 +126,19 @@ public class SolicitudesController : ControllerBase
             .Include(x => x.CreadoPor).ThenInclude(u => u!.Trabajador)
             .FirstOrDefaultAsync(x => x.Id == id);
         if (s == null) return NotFound(new { error = "La solicitud no existe." });
+        var esCreador = s.CreadoPorId == _usuario.Id;
+        if (!esCreador && !VeTodas(permisos))
+            return StatusCode(403, new { error = "Solo puedes ver las solicitudes que creaste." });
 
         var vpn = s.Tipo == TipoVpn
             ? await _context.SolicitudesVpn.Include(v => v.Motivo).FirstOrDefaultAsync(v => v.SolicitudId == s.Id)
             : null;
+        var situacion = Situacion(s, vpn);
+        var acciones = permisos.Contains(PermisoBandeja) ? FlujoSolicitud.AccionesTi(situacion) : new List<string>();
+        if (esCreador)
+            acciones.AddRange(FlujoSolicitud.AccionesCreador(situacion,
+                await _context.Solicitudes.AnyAsync(x => x.SolicitudOrigenId == s.Id),
+                PuedeCrearTipo(permisos, s.Tipo), permisos.Contains(PermisoFichaVpn)));
 
         return new SolicitudBandejaDetalleDto
         {
@@ -132,7 +162,7 @@ public class SolicitudesController : ControllerBase
                 Ficha = AFicha(vpn)
             },
             Historial = await HistorialAsync(s.Id),
-            AccionesPermitidas = FlujoSolicitud.AccionesTi(Situacion(s, vpn))
+            AccionesPermitidas = acciones
         };
     }
 
@@ -158,27 +188,6 @@ public class SolicitudesController : ControllerBase
     public Task<IActionResult> RechazarFicha(int id, JustificacionRechazoDto dto) =>
         EjecutarAccionTiAsync(id, FlujoSolicitud.RechazarFicha, dto.Justificacion, soloVpn: true);
 
-    // RRHH aprueba un Bloqueo pendiente y queda En proceso para TI.
-    [HttpPut("{id:int}/aprobar-rrhh")]
-    [RequierePermiso(PermisoAprobarBloqueo)]
-    public async Task<IActionResult> AprobarRrhh(int id)
-    {
-        var usuarioId = _usuario.Id;
-
-        var s = await _context.Solicitudes.FirstOrDefaultAsync(x => x.Id == id);
-        if (s == null) return NotFound(new { error = "La solicitud no existe." });
-        if (!FlujoSolicitud.PuedeAprobarRrhh(Situacion(s, null)))
-            return Conflict(new { error = "Solo se pueden aprobar solicitudes de bloqueo pendientes." });
-
-        s.Estado = EnProceso;
-        _context.HistorialSolicitudes.Add(new HistorialSolicitud
-        {
-            SolicitudId = s.Id, Accion = "Aprobada por RRHH", RealizadoPorId = usuarioId, Fecha = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
-        return NoContent();
-    }
-
     private async Task<IActionResult> EjecutarAccionTiAsync(int id, string accion, string? justificacion = null, bool soloVpn = false)
     {
         var usuarioId = _usuario.Id;
@@ -201,6 +210,8 @@ public class SolicitudesController : ControllerBase
         if (accion == FlujoSolicitud.Tomar && vpn != null) vpn.FormularioHabilitado = true;
         if (accion == FlujoSolicitud.ConfirmarEnvio && vpn != null) vpn.FechaEnvioProveedor = ahora;
         if (esRechazo) s.MotivoRechazo = justificacion!.Trim();
+        var comentario = esRechazo ? s.MotivoRechazo
+            : accion == FlujoSolicitud.Completar && s.Tipo == TipoBloqueo ? await AplicarBloqueoAsync(s) : null;
 
         _context.HistorialSolicitudes.Add(new HistorialSolicitud
         {
@@ -208,72 +219,10 @@ public class SolicitudesController : ControllerBase
             Accion = historial,
             RealizadoPorId = usuarioId,
             Fecha = ahora,
-            Comentario = esRechazo ? s.MotivoRechazo : null
+            Comentario = comentario
         });
         await _context.SaveChangesAsync();
         return NoContent();
-    }
-
-    // ---------- Jefatura: mis solicitudes ----------
-
-    [HttpGet("mias")]
-    [RequierePermiso(PermisoPropias)]
-    public async Task<ActionResult<PaginaDto<MiSolicitudDto>>> Mias(
-        string? tipo = null, string? estado = null, int pagina = 1, int tamano = 20)
-    {
-        var usuarioId = _usuario.Id;
-
-        var query = _context.Solicitudes.Where(s => s.CreadoPorId == usuarioId);
-        if (!string.IsNullOrWhiteSpace(tipo))
-        {
-            var tipoDb = TipoADb(tipo);
-            if (tipoDb == null) return BadRequest(new { error = "Tipo de solicitud no válido." });
-            query = query.Where(s => s.Tipo == tipoDb);
-        }
-        if (!string.IsNullOrWhiteSpace(estado))
-        {
-            var estadoDb = EstadoADb(estado);
-            if (estadoDb == null) return BadRequest(new { error = "Estado de solicitud no válido." });
-            query = query.Where(s => s.Estado == estadoDb);
-        }
-
-        pagina = Math.Max(1, pagina);
-        tamano = Math.Clamp(tamano, 1, 100);
-        var total = await query.CountAsync();
-
-        var filas = await query
-            .OrderByDescending(s => s.FechaCreacion)
-            .Skip((pagina - 1) * tamano)
-            .Take(tamano)
-            .Select(s => new
-            {
-                s.Id, s.Tipo, s.Estado, s.FechaCreacion, s.FechaVencimientoSLA, s.MotivoRechazo,
-                Vpn = _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id)
-                    .Select(v => new { MotivoNombre = v.Motivo!.Nombre, v.FormularioHabilitado, FichaCompletada = v.Nombres != null })
-                    .FirstOrDefault()
-            })
-            .ToListAsync();
-
-        var ahora = DateTime.UtcNow;
-        return new PaginaDto<MiSolicitudDto>
-        {
-            Total = total,
-            Pagina = pagina,
-            Tamano = tamano,
-            Items = filas.Select(f => new MiSolicitudDto
-            {
-                Id = f.Id,
-                Tipo = TipoAApi(f.Tipo),
-                Estado = EstadoAApi(f.Estado),
-                FechaCreacion = f.FechaCreacion,
-                FechaVencimientoSLA = f.FechaVencimientoSLA,
-                Vencida = EstaVencida(f.Estado, f.FechaVencimientoSLA, ahora),
-                MotivoNombre = f.Vpn?.MotivoNombre,
-                FormularioHabilitado = f.Vpn?.FormularioHabilitado ?? false,
-                MotivoRechazo = f.MotivoRechazo,
-                FichaCompletada = f.Vpn?.FichaCompletada ?? false
-            }).ToList()
-        };
     }
 
     // ---------- VPN ----------
@@ -393,6 +342,34 @@ public class SolicitudesController : ControllerBase
     }
 
     // ---------- Apoyo ----------
+
+    private Task<List<string>> PermisosDelRolAsync() =>
+        _context.RolPermisos.Where(rp => rp.RolId == _usuario.RolId).Select(rp => rp.Permiso!.Codigo).ToListAsync();
+
+    private static bool VeTodas(List<string> permisos) =>
+        permisos.Contains(PermisoVerTodas) || permisos.Contains(PermisoBandeja);
+
+    // Ve la lista quien ve todas, quien consulta las propias o quien puede crear algún tipo.
+    private static bool PuedeVerSolicitudes(List<string> permisos) =>
+        VeTodas(permisos) || permisos.Contains(PermisoPropias) || PermisoPorTipo.Values.Any(permisos.Contains);
+
+    private static bool PuedeCrearTipo(List<string> permisos, string tipoDb) =>
+        PermisoPorTipo.TryGetValue(tipoDb, out var codigo) && permisos.Contains(codigo);
+
+    // Bloqueo completado: el trabajador queda inactivo en nuestra base (con su fecha de salida), para que
+    // la dotación esté al día. Un bloqueo temporal no lo inactiva. Devuelve el comentario para el historial.
+    private async Task<string?> AplicarBloqueoAsync(Solicitud s)
+    {
+        var bloqueo = await _context.SolicitudesBloqueo.FirstOrDefaultAsync(b => b.SolicitudId == s.Id);
+        var trabajador = s.TrabajadorId == null ? null : await _context.Trabajadores.FindAsync(s.TrabajadorId);
+        if (bloqueo == null || trabajador == null) return null;
+        if (bloqueo.EsTemporal) return "Bloqueo temporal: el trabajador sigue activo en la base.";
+
+        var salida = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(bloqueo.FechaInicio, HoraChile.Zona()));
+        trabajador.Activo = false;
+        trabajador.FechaSalida = salida;
+        return $"Trabajador marcado como inactivo (fecha de salida {salida:dd-MM-yyyy}).";
+    }
 
     private static FlujoSolicitud.Situacion Situacion(Solicitud s, SolicitudVpn? vpn) =>
         new(s.Tipo, s.Estado, vpn?.FormularioHabilitado ?? false, vpn?.Nombres != null);

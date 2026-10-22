@@ -8,18 +8,10 @@ using MafTi.Application;
 using MafTi.Api.Seguridad;
 namespace MafTi.Api.Controllers;
 
-[ApiController]
-[Route("api/[controller]")]
-public class SolicitudController : ControllerBase
+// Creación de solicitudes de Ingreso, Bloqueo y Modificación (POST api/solicitudes/ingreso|bloqueo|modificacion).
+// Es parte de SolicitudesController: una sola API de solicitudes en api/solicitudes.
+public partial class SolicitudesController
 {
-    private readonly AppDbContext _context;
-    private readonly UsuarioActual _usuario;
-
-    public SolicitudController(AppDbContext context, UsuarioActual usuario)
-    {
-        _context = context;
-        _usuario = usuario;
-    }
     private static readonly Dictionary<string, string> PermisoPorTipo = new()
 {
     { "Ingreso", "CrearSolicitudIngreso" },
@@ -27,161 +19,6 @@ public class SolicitudController : ControllerBase
     { "Bloqueo", "CrearSolicitudBloqueo" },
     { "VPN", "SolicitarAccesoVPN" }
 };
-    private const string SinProveedor = "Proveedor por definir";
-
-    [HttpGet]
-    public async Task<ActionResult<PaginacionResultado<SolicitudListaDto>>> GetAll(
-        int pagina = 1, int tamanoPagina = 20, string? tipo = null,
-        string? estado = null, bool? urgente = null, DateTime? desde = null, DateTime? hasta = null)
-    {
-        bool veTodo = await _context.RolPermisos
-            .AnyAsync(rp => rp.RolId == _usuario.RolId && rp.Permiso!.Codigo == "ConsultarTodasLasSolicitudes");
-
-        var query = _context.Solicitudes.AsQueryable();
-        var tiposCreables = await TiposQuePuedeCrearAsync();
-
-        if (!veTodo)
-            query = query.Where(s => tiposCreables.Contains(s.Tipo));
-
-        // Jefatura solo ve solicitudes de trabajadores de su área (y las VPN que creó, que no tienen trabajador).
-        if (_usuario.AreaRestringida is int areaPropia)
-            query = query.Where(s => s.Trabajador!.AreaId == areaPropia || s.CreadoPorId == _usuario.Id);
-
-         if (!string.IsNullOrEmpty(tipo)) query = query.Where(s => s.Tipo == tipo);
-         if (!string.IsNullOrEmpty(estado)) query = query.Where(s => s.Estado == estado);
-         if (urgente == true) query = query.Where(s => s.Estado == "Pendiente" && s.FechaVencimientoSLA < DateTime.UtcNow);
-         if (desde.HasValue) query = query.Where(s => s.FechaCreacion >= desde.Value);
-         if (hasta.HasValue) query = query.Where(s => s.FechaCreacion <= hasta.Value);
-
-        var resultado = await query
-            .OrderByDescending(s => s.FechaCreacion)
-            .Select(s => new SolicitudListaDto
-            {
-                Id = s.Id,
-                // VPN no tiene trabajador: se muestra el proveedor de la ficha cuando ya existe.
-                TrabajadorNombre = s.TrabajadorId != null
-                    ? s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido
-                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
-                        .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault() ?? SinProveedor,
-                AreaNombre = s.TrabajadorId != null
-                    ? s.Trabajador!.Area!.Nombre
-                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Departamento != null)
-                        .Select(v => v.Departamento).FirstOrDefault() ?? "—",
-                Tipo = s.Tipo,
-                Estado = s.Estado,
-                FechaCreacion = s.FechaCreacion,
-                FechaVencimientoSLA = s.FechaVencimientoSLA,
-                EsUrgente = s.Estado == "Pendiente" && s.FechaVencimientoSLA < DateTime.UtcNow,
-                TrabajadorId = s.TrabajadorId,
-                MotivoRechazo = s.MotivoRechazo,
-                // Corregir = crear una solicitud nueva del mismo tipo enlazada a esta (VPN tiene su propio flujo).
-                PuedeCorregir = s.Estado == "Rechazada" && s.CreadoPorId == _usuario.Id && s.Tipo != "VPN"
-                    && tiposCreables.Contains(s.Tipo)
-                    && !_context.Solicitudes.Any(x => x.SolicitudOrigenId == s.Id)
-            })
-            .PaginarAsync(pagina, tamanoPagina);
-
-        return Ok(resultado);
-    }
-
-    [HttpGet("{id}")]
-    public async Task<ActionResult<SolicitudDetalleDto>> GetById(int id)
-    {
-       var s = await _context.Solicitudes
-            .Include(x => x.Trabajador)
-            .Include(x => x.CreadoPor)
-                .ThenInclude(u => u!.Trabajador)
-             .FirstOrDefaultAsync(x => x.Id == id);
-
-        if (s == null) return NotFound();
-        if (_usuario.AreaRestringida is int areaPropia && s.Trabajador?.AreaId != areaPropia && s.CreadoPorId != _usuario.Id)
-            return StatusCode(403, new { error = "Solo puedes consultar solicitudes de tu área." });
-
-        SolicitudBloqueoDetalleDto? bloqueo = null;
-        if (s.Tipo == "Bloqueo")
-        {
-            bloqueo = await _context.SolicitudesBloqueo
-                .Where(b => b.SolicitudId == s.Id)
-                .Select(b => new SolicitudBloqueoDetalleDto
-                {
-                    Id = b.Id,
-                    SolicitudId = b.SolicitudId,
-                    EsTemporal = b.EsTemporal,
-                    FechaInicio = b.FechaInicio,
-                    FechaFin = b.FechaFin,
-                    Justificacion = b.Justificacion,
-                    TienePc = b.TienePc,
-                    CasillaOpera = b.CasillaOpera
-                })
-                .FirstOrDefaultAsync();
-        }
-
-        SolicitudModificacionDetalleDto? modificacion = null;
-        if (s.Tipo == "Modificación")
-        {
-            modificacion = await _context.SolicitudesModificacion
-                .Where(m => m.SolicitudId == s.Id)
-                .Select(m => new SolicitudModificacionDetalleDto
-                {
-                    Id = m.Id,
-                    SolicitudId = m.SolicitudId,
-                    Justificacion = m.Justificacion,
-                    PrimerNombre = m.PrimerNombre,
-                    SegundoNombre = m.SegundoNombre,
-                    PrimerApellido = m.PrimerApellido,
-                    SegundoApellido = m.SegundoApellido,
-                    FechaNacimiento = m.FechaNacimiento,
-                    Sexo = m.Sexo,
-                    Correo = m.Correo,
-                    DireccionCorporativaId = m.DireccionCorporativaId,
-                    AreaId = m.AreaId,
-                    CargoId = m.CargoId,
-                    LugarTrabajoId = m.LugarTrabajoId,
-                    FechaIncorporacion = m.FechaIncorporacion,
-                    DireccionDomicilio = m.DireccionDomicilio,
-                    JefeDirecto = m.JefeDirecto,
-                    HomologarAccesosDesde = m.HomologarAccesosDesde,
-                    TieneTelefonoCorporativo = m.TieneTelefonoCorporativo,
-                    SolicitaTelefono = m.SolicitaTelefono
-                })
-                .FirstOrDefaultAsync();
-
-            if (modificacion != null)
-            {
-                var accesos = await _context.SolicitudDetalles
-                    .Where(d => d.SolicitudId == s.Id)
-                    .Select(d => new { d.Accion, Acceso = new SolicitudModificacionAccesoDto
-                    {
-                        CatalogoId = d.CatalogoId,
-                        Nombre = d.Catalogo!.Nombre,
-                        Tipo = d.Catalogo.Tipo
-                    } })
-                    .ToListAsync();
-                modificacion.AccesosAgregar = accesos.Where(a => a.Accion == "Agregar").Select(a => a.Acceso).ToList();
-                modificacion.AccesosQuitar = accesos.Where(a => a.Accion == "Quitar").Select(a => a.Acceso).ToList();
-            }
-        }
-
-        return new SolicitudDetalleDto
-        {
-            Id = s.Id,
-            TrabajadorId = s.TrabajadorId,
-            TrabajadorNombre = s.Trabajador != null
-                ? s.Trabajador.PrimerNombre + " " + s.Trabajador.PrimerApellido
-                : await _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
-                    .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefaultAsync() ?? SinProveedor,
-            CreadoPorId = s.CreadoPorId,
-            CreadoPorCorreo = s.CreadoPor!.Trabajador!.Correo,
-            Tipo = s.Tipo,
-            Estado = s.Estado,
-            MotivoRechazo = s.MotivoRechazo,
-            SolicitudOrigenId = s.SolicitudOrigenId,
-            FechaCreacion = s.FechaCreacion,
-            FechaVencimientoSLA = s.FechaVencimientoSLA,
-            Bloqueo = bloqueo,
-            Modificacion = modificacion
-        };
-    }
 
     [HttpPost("ingreso")]
     [RequierePermiso("CrearSolicitudIngreso")]
@@ -318,7 +155,8 @@ public class SolicitudController : ControllerBase
             CreadoPorId = _usuario.Id,
             SolicitudOrigenId = dto.SolicitudOrigenId,
             Tipo = "Bloqueo",
-            Estado = "Pendiente",
+            // RRHH es quien crea el bloqueo, así que nace aprobado: queda En proceso para que TI lo complete.
+            Estado = FlujoSolicitud.EstadoInicial("Bloqueo"),
             FechaCreacion = ahora,
             // TODO: SLA real en días hábiles considerando feriados; por ahora, fin del mismo día en hora de Chile.
             FechaVencimientoSLA = HoraChile.FinDelDiaUtc(ahora)
@@ -350,7 +188,7 @@ public class SolicitudController : ControllerBase
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = nuevaSolicitud.Id }, new SolicitudBloqueoResultadoDto
+        return CreatedAtAction(nameof(Detalle), new { id = nuevaSolicitud.Id }, new SolicitudBloqueoResultadoDto
         {
             SolicitudId = nuevaSolicitud.Id,
             FechaVencimientoSLA = nuevaSolicitud.FechaVencimientoSLA
@@ -536,7 +374,7 @@ public class SolicitudController : ControllerBase
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = nuevaSolicitud.Id }, new SolicitudModificacionResultadoDto
+        return CreatedAtAction(nameof(Detalle), new { id = nuevaSolicitud.Id }, new SolicitudModificacionResultadoDto
         {
             SolicitudId = nuevaSolicitud.Id,
             FechaVencimientoSLA = nuevaSolicitud.FechaVencimientoSLA
@@ -544,16 +382,6 @@ public class SolicitudController : ControllerBase
     }
 
     // ---------- Corrección de solicitudes rechazadas (adaptado de b5e1422, feature/ariel) ----------
-
-    // Tipos de solicitud que el rol del usuario puede crear.
-    private async Task<List<string>> TiposQuePuedeCrearAsync()
-    {
-        var codigos = await _context.RolPermisos
-            .Where(rp => rp.RolId == _usuario.RolId)
-            .Select(rp => rp.Permiso!.Codigo)
-            .ToListAsync();
-        return PermisoPorTipo.Where(p => codigos.Contains(p.Value)).Select(p => p.Key).ToList();
-    }
 
     // La corrección es una solicitud nueva enlazada a la original (que sigue Rechazada, sin reabrirse).
     // Solo la corrige quien la creó. En Ingreso se compara el RUT, porque cada Ingreso crea su propio trabajador.
@@ -587,24 +415,5 @@ public class SolicitudController : ControllerBase
             DateTimeKind.Local => fecha.Value.ToUniversalTime(),
             _ => DateTime.SpecifyKind(fecha.Value, DateTimeKind.Utc)
         };
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<SolicitudDetalleDto>> Create(SolicitudCreateDto dto)
-    {
-        var nueva = new Solicitud
-        {
-            TrabajadorId = dto.TrabajadorId,
-            CreadoPorId = _usuario.Id,
-            Tipo = dto.Tipo,
-            Estado = "Pendiente",
-            FechaCreacion = DateTime.UtcNow,
-            FechaVencimientoSLA = DateTime.UtcNow.AddDays(4) 
-        };
-
-        _context.Solicitudes.Add(nueva);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetById), new { id = nueva.Id }, dto);
     }
 }
