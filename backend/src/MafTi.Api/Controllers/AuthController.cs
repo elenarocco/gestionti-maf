@@ -39,6 +39,8 @@ public class AuthController : ControllerBase
             rol = _usuario.Rol,
             areaId = _usuario.AreaId,
             areaNombre,
+            // "area" = solo ve su área (Jefatura); "empresa" = ve todo. Lo decide UsuarioActual.AreaRestringida.
+            alcance = _usuario.AreaRestringida.HasValue ? "area" : "empresa",
             permisos
         });
     }
