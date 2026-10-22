@@ -10,7 +10,7 @@ using MafTi.Api.Seguridad;
 namespace MafTi.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/catalogos")]
 public class CatalogoController : ControllerBase
 {
     private readonly AppDbContext _context;
