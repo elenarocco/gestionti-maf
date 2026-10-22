@@ -71,6 +71,7 @@ public class SolicitudBandejaDetalleDto
     public DateTime FechaVencimientoSLA { get; set; }
     public bool Vencida { get; set; }
     public string CreadoPorNombre { get; set; } = string.Empty;
+    public int? TrabajadorId { get; set; }
     public string? TrabajadorNombre { get; set; }
     public Dictionary<string, object?>? Detalle { get; set; }   // campos según el tipo
     public VpnResumenDto? Vpn { get; set; }
