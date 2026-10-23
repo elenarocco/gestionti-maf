@@ -38,6 +38,7 @@ auth.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
 if (esDesarrollo) auth.AgregarEsquema(builder.Configuration);
 
 builder.Services.AddScoped<UsuarioActual>();
+builder.Services.AddScoped<MafTi.Api.Common.ServicioSla>();
 
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();

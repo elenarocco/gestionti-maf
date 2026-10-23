@@ -71,3 +71,7 @@ desarrollo ni Swagger.
   `fonts-dejavu` (o `fonts-liberation`). Sin fuente, la descarga en PDF responde con un error que lo indica.
 - La librería de PDF (PDFsharp-MigraDoc) está fijada en 6.2.4, la última versión con licencia MIT: desde la
   6.5.0 es AGPL. No actualizarla sin revisar la licencia.
+- El servidor debe tener la zona horaria `America/Santiago` disponible y los datos de idioma (ICU, en Linux el
+  paquete `libicu`): el SLA se calcula en hora de Chile y el aviso de plazo usa los días en español.
+- Los feriados del SLA están en la tabla `Feriados` (cargados 2026 y 2027). Antes de 2028 hay que agregar los del
+  año siguiente con una migración.
