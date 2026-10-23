@@ -57,6 +57,42 @@ namespace MafTi.Infrastructure.Migrations
                     b.ToTable("Accesos");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.CambioUsuarioSistema", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Accion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Detalle")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RealizadoPorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsuarioSistemaId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RealizadoPorId");
+
+                    b.HasIndex("UsuarioSistemaId");
+
+                    b.ToTable("CambiosUsuarioSistema");
+                });
+
             modelBuilder.Entity("MafTi.Domain.Catalogo", b =>
                 {
                     b.Property<int>("Id")
@@ -565,7 +601,8 @@ namespace MafTi.Infrastructure.Migrations
 
                     b.HasIndex("RolId");
 
-                    b.HasIndex("TrabajadorId");
+                    b.HasIndex("TrabajadorId")
+                        .IsUnique();
 
                     b.ToTable("UsuariosSistema");
                 });
@@ -593,6 +630,25 @@ namespace MafTi.Infrastructure.Migrations
                     b.Navigation("Solicitud");
 
                     b.Navigation("Trabajador");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.CambioUsuarioSistema", b =>
+                {
+                    b.HasOne("MafTi.Domain.UsuarioSistema", "RealizadoPor")
+                        .WithMany()
+                        .HasForeignKey("RealizadoPorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MafTi.Domain.UsuarioSistema", "UsuarioSistema")
+                        .WithMany()
+                        .HasForeignKey("UsuarioSistemaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RealizadoPor");
+
+                    b.Navigation("UsuarioSistema");
                 });
 
             modelBuilder.Entity("MafTi.Domain.Catalogo", b =>
