@@ -95,6 +95,18 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
         e.Property(x => x.Filtros).HasMaxLength(500);
         e.HasIndex(x => x.Fecha);
     });
+
+    // Un solo acceso por trabajador: si se le quita, se desactiva y se puede reactivar.
+    modelBuilder.Entity<UsuarioSistema>().HasIndex(x => x.TrabajadorId).IsUnique();
+
+    // Bitácora de cambios de acceso: borrar un usuario no debe borrar su historial (se desactiva, no se borra).
+    modelBuilder.Entity<CambioUsuarioSistema>(e =>
+    {
+        e.HasOne(x => x.UsuarioSistema).WithMany().HasForeignKey(x => x.UsuarioSistemaId).OnDelete(DeleteBehavior.Restrict);
+        e.HasOne(x => x.RealizadoPor).WithMany().HasForeignKey(x => x.RealizadoPorId).OnDelete(DeleteBehavior.Restrict);
+        e.Property(x => x.Accion).HasMaxLength(50);
+        e.Property(x => x.Detalle).HasMaxLength(500);
+    });
 }
 
     public DbSet<Trabajador> Trabajadores { get; set; }
@@ -111,4 +123,5 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<SolicitudModificacion> SolicitudesModificacion => Set<SolicitudModificacion>();
     public DbSet<SolicitudVpn> SolicitudesVpn => Set<SolicitudVpn>();
     public DbSet<RegistroDescarga> RegistrosDescarga => Set<RegistroDescarga>();
+    public DbSet<CambioUsuarioSistema> CambiosUsuarioSistema => Set<CambioUsuarioSistema>();
 }
