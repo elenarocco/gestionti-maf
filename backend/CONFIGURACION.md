@@ -67,3 +67,7 @@ desarrollo ni Swagger.
   distinta a la de desarrollo.
 - Agrega la URL real del frontend como redirect "Aplicación de página única (SPA)" en Entra ID.
 - En el frontend, `apiUrl` de `src/environments/environment.ts` debe apuntar a `https://<dominio de la API>/api`.
+- El servidor debe tener la zona horaria `America/Santiago` disponible y los datos de idioma (ICU, en Linux el
+  paquete `libicu`): el SLA se calcula en hora de Chile y el aviso de plazo usa los días en español.
+- Los feriados del SLA están en la tabla `Feriados` (cargados 2026 y 2027). Antes de 2028 hay que agregar los del
+  año siguiente con una migración.

@@ -20,6 +20,19 @@ public partial class SolicitudesController
     { "VPN", "SolicitarAccesoVPN" }
 };
 
+    // Plazo (SLA) que tendría una solicitud de ese tipo si se enviara ahora. Lo pide el formulario para avisar
+    // cuánto tarda y desde cuándo cuenta; el plazo real se calcula de nuevo al crearla.
+    [HttpGet("plazo")]
+    [RequierePermiso("CrearSolicitudIngreso", "CrearSolicitudModificacion", "CrearSolicitudBloqueo", "SolicitarAccesoVPN")]
+    public async Task<ActionResult<PlazoSlaDto>> Plazo(string tipo)
+    {
+        var tipoDb = SolicitudValores.TipoADb(tipo);
+        if (tipoDb == null) return BadRequest(new { error = "Tipo de solicitud no válido." });
+
+        var p = await _sla.CalcularAsync(tipoDb, DateTime.UtcNow);
+        return new PlazoSlaDto { Regla = p.Regla, Inicio = p.InicioUtc, Vence = p.VenceUtc, Mensaje = p.Mensaje };
+    }
+
     [HttpPost("ingreso")]
     [RequierePermiso("CrearSolicitudIngreso")]
     public async Task<ActionResult<IngresoResultadoDto>> CrearIngreso(IngresoCreateDto dto)
@@ -69,6 +82,7 @@ public partial class SolicitudesController
         _context.Trabajadores.Add(nuevoTrabajador);
         await _context.SaveChangesAsync();
 
+        var ahoraIngreso = DateTime.UtcNow;
         var nuevaSolicitud = new Solicitud
         {
             TrabajadorId = nuevoTrabajador.Id,
@@ -76,8 +90,8 @@ public partial class SolicitudesController
             SolicitudOrigenId = dto.SolicitudOrigenId,
             Tipo = "Ingreso",
             Estado = "Pendiente",
-            FechaCreacion = DateTime.UtcNow,
-            FechaVencimientoSLA = DateTime.UtcNow.AddDays(4)
+            FechaCreacion = ahoraIngreso,
+            FechaVencimientoSLA = (await _sla.CalcularAsync(SolicitudValores.TipoIngreso, ahoraIngreso)).VenceUtc
         };
 
         _context.Solicitudes.Add(nuevaSolicitud);
@@ -158,8 +172,7 @@ public partial class SolicitudesController
             // RRHH es quien crea el bloqueo, así que nace aprobado: queda En proceso para que TI lo complete.
             Estado = FlujoSolicitud.EstadoInicial("Bloqueo"),
             FechaCreacion = ahora,
-            // TODO: SLA real en días hábiles considerando feriados; por ahora, fin del mismo día en hora de Chile.
-            FechaVencimientoSLA = HoraChile.FinDelDiaUtc(ahora)
+            FechaVencimientoSLA = (await _sla.CalcularAsync(SolicitudValores.TipoBloqueo, ahora)).VenceUtc
         };
 
         _context.Solicitudes.Add(nuevaSolicitud);
@@ -311,7 +324,7 @@ public partial class SolicitudesController
             Tipo = "Modificación",
             Estado = "Pendiente",
             FechaCreacion = ahora,
-            FechaVencimientoSLA = ahora.AddDays(4)
+            FechaVencimientoSLA = (await _sla.CalcularAsync(SolicitudValores.TipoModificacion, ahora)).VenceUtc
         };
 
         _context.Solicitudes.Add(nuevaSolicitud);
