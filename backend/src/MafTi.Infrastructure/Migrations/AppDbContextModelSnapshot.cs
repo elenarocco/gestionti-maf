@@ -139,6 +139,47 @@ namespace MafTi.Infrastructure.Migrations
                     b.ToTable("Permisos");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.RegistroDescarga", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Filas")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Filtros")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Formato")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Reporte")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("UsuarioSistemaId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Fecha");
+
+                    b.HasIndex("UsuarioSistemaId");
+
+                    b.ToTable("RegistrosDescarga");
+                });
+
             modelBuilder.Entity("MafTi.Domain.Rol", b =>
                 {
                     b.Property<int>("Id")
@@ -622,6 +663,17 @@ namespace MafTi.Infrastructure.Migrations
                     b.Navigation("RealizadoPor");
 
                     b.Navigation("Solicitud");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.RegistroDescarga", b =>
+                {
+                    b.HasOne("MafTi.Domain.UsuarioSistema", "UsuarioSistema")
+                        .WithMany()
+                        .HasForeignKey("UsuarioSistemaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("UsuarioSistema");
                 });
 
             modelBuilder.Entity("MafTi.Domain.RolPermiso", b =>

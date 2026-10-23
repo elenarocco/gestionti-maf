@@ -7,6 +7,8 @@ namespace MafTi.Api.Seguridad;
 
 // Exige que el rol del usuario de la sesión tenga el permiso indicado (tabla RolPermisos).
 // La sesión la resuelve UsuarioActualMiddleware desde el token.
+// Se puede repetir: con dos atributos el rol debe tener ambos permisos.
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public class RequierePermisoAttribute : Attribute, IAsyncActionFilter
 {
     private readonly string[] _codigos;

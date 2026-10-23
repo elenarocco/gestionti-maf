@@ -29,7 +29,9 @@ public static class SeguridadHttp
         builder.Services.AddCors(o => o.AddPolicy(PoliticaCors, p => p
             .WithOrigins(origenes)
             .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
-            .WithHeaders("Authorization", "Content-Type")));
+            .WithHeaders("Authorization", "Content-Type")
+            // El frontend lee el nombre del archivo de los reportes descargados.
+            .WithExposedHeaders("Content-Disposition")));
 
         // El servidor web (IIS o nginx) recibe el HTTPS y le pasa la petición a la API; estas cabeceras
         // le dicen a la API la IP real del cliente y que la petición original venía por HTTPS.
