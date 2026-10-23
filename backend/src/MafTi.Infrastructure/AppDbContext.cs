@@ -85,6 +85,12 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 
     modelBuilder.Entity<SolicitudDetalle>()
         .Property(x => x.Accion).HasMaxLength(10).HasDefaultValue("Agregar");
+
+    modelBuilder.Entity<Feriado>(e =>
+    {
+        e.HasIndex(x => x.Fecha).IsUnique();
+        e.Property(x => x.Nombre).HasMaxLength(100);
+    });
 }
 
     public DbSet<Trabajador> Trabajadores { get; set; }
@@ -100,4 +106,5 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<SolicitudBloqueo> SolicitudesBloqueo => Set<SolicitudBloqueo>();
     public DbSet<SolicitudModificacion> SolicitudesModificacion => Set<SolicitudModificacion>();
     public DbSet<SolicitudVpn> SolicitudesVpn => Set<SolicitudVpn>();
+    public DbSet<Feriado> Feriados => Set<Feriado>();
 }
