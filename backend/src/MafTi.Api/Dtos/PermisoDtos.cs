@@ -6,9 +6,3 @@ public class PermisoListaDto
     public string Codigo { get; set; } = string.Empty;
     public string? Descripcion { get; set; }
 }
-
-public class PermisoCreateDto
-{
-    public string Codigo { get; set; } = string.Empty;
-    public string? Descripcion { get; set; }
-}
