@@ -8,12 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Identity.Web" Version="4.16.1" />
+    <!-- PDFsharp-MigraDoc queda en 6.2.4: es la última versión MIT. Desde la 6.5.0 la licencia es AGPL,
+         que obligaría a publicar el código de la plataforma. No actualizar sin revisar la licencia. -->
+    <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <!-- No lo usamos directamente: lo traen Microsoft.Identity.Web y otras librerías en una versión con
          vulnerabilidades (CVE-2026-84008, CVE-2026-70162). Se fija la versión corregida; se puede quitar cuando

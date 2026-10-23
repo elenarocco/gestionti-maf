@@ -85,6 +85,16 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 
     modelBuilder.Entity<SolicitudDetalle>()
         .Property(x => x.Accion).HasMaxLength(10).HasDefaultValue("Agregar");
+
+    // Auditoría de descargas: borrar un usuario no debe borrar lo que descargó (se desactiva, no se borra).
+    modelBuilder.Entity<RegistroDescarga>(e =>
+    {
+        e.HasOne(x => x.UsuarioSistema).WithMany().HasForeignKey(x => x.UsuarioSistemaId).OnDelete(DeleteBehavior.Restrict);
+        e.Property(x => x.Reporte).HasMaxLength(50);
+        e.Property(x => x.Formato).HasMaxLength(10);
+        e.Property(x => x.Filtros).HasMaxLength(500);
+        e.HasIndex(x => x.Fecha);
+    });
 }
 
     public DbSet<Trabajador> Trabajadores { get; set; }
@@ -100,4 +110,5 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<SolicitudBloqueo> SolicitudesBloqueo => Set<SolicitudBloqueo>();
     public DbSet<SolicitudModificacion> SolicitudesModificacion => Set<SolicitudModificacion>();
     public DbSet<SolicitudVpn> SolicitudesVpn => Set<SolicitudVpn>();
+    public DbSet<RegistroDescarga> RegistrosDescarga => Set<RegistroDescarga>();
 }

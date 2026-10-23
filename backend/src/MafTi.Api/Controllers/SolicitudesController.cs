@@ -5,6 +5,7 @@ using MafTi.Domain;
 using MafTi.Api.Common;
 using MafTi.Api.Dtos;
 using MafTi.Api.Seguridad;
+using MafTi.Api.Reportes;
 using MafTi.Application;
 using static MafTi.Application.SolicitudValores;
 
@@ -44,23 +45,8 @@ public partial class SolicitudesController : ControllerBase
         if (!PuedeVerSolicitudes(permisos))
             return StatusCode(403, new { error = $"Tu rol '{_usuario.Rol}' no puede ver solicitudes." });
 
-        var query = _context.Solicitudes.AsQueryable();
-        if (!VeTodas(permisos)) query = query.Where(s => s.CreadoPorId == _usuario.Id);
-
-        if (!string.IsNullOrWhiteSpace(tipo))
-        {
-            var tipoDb = TipoADb(tipo);
-            if (tipoDb == null) return BadRequest(new { error = "Tipo de solicitud no válido." });
-            query = query.Where(s => s.Tipo == tipoDb);
-        }
-        if (string.Equals(estado?.Trim(), "Abiertas", StringComparison.OrdinalIgnoreCase))
-            query = query.Where(s => s.Estado == Pendiente || s.Estado == EnProceso);
-        else if (!string.IsNullOrWhiteSpace(estado))
-        {
-            var estadoDb = EstadoADb(estado);
-            if (estadoDb == null) return BadRequest(new { error = "Estado de solicitud no válido." });
-            query = query.Where(s => s.Estado == estadoDb);
-        }
+        var (query, error) = Filtrar(permisos, tipo, estado);
+        if (query == null) return error!;
 
         pagina = Math.Max(1, pagina);
         tamano = Math.Clamp(tamano, 1, 100);
@@ -115,6 +101,113 @@ public partial class SolicitudesController : ControllerBase
             }).ToList()
         };
     }
+
+    // Filtros de la lista; los usan la pantalla y el reporte, así se descarga lo mismo que se ve.
+    private (IQueryable<Solicitud>? Query, ActionResult? Error) Filtrar(List<string> permisos, string? tipo, string? estado)
+    {
+        var query = _context.Solicitudes.AsQueryable();
+        if (!VeTodas(permisos)) query = query.Where(s => s.CreadoPorId == _usuario.Id);
+
+        if (!string.IsNullOrWhiteSpace(tipo))
+        {
+            var tipoDb = TipoADb(tipo);
+            if (tipoDb == null) return (null, BadRequest(new { error = "Tipo de solicitud no válido." }));
+            query = query.Where(s => s.Tipo == tipoDb);
+        }
+        if (string.Equals(estado?.Trim(), "Abiertas", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(s => s.Estado == Pendiente || s.Estado == EnProceso);
+        else if (!string.IsNullOrWhiteSpace(estado))
+        {
+            var estadoDb = EstadoADb(estado);
+            if (estadoDb == null) return (null, BadRequest(new { error = "Estado de solicitud no válido." }));
+            query = query.Where(s => s.Estado == estadoDb);
+        }
+        return (query, null);
+    }
+
+    // Reporte de solicitudes (Excel o PDF) con los mismos filtros y el mismo alcance de la lista:
+    // quien ve todas descarga todas; el resto, solo las que creó. desde/hasta filtran por fecha de creación.
+    [HttpGet("exportar")]
+    [RequierePermiso(DescargaReporte.Permiso)]
+    public async Task<IActionResult> Exportar(string formato, string? tipo = null, string? estado = null,
+        DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (DescargaReporte.LeerFormato(formato) is not FormatoReporte fmt) return DescargaReporte.FormatoInvalido(this);
+        var permisos = await PermisosDelRolAsync();
+        if (!PuedeVerSolicitudes(permisos))
+            return StatusCode(403, new { error = $"Tu rol '{_usuario.Rol}' no puede ver solicitudes." });
+
+        var (query, error) = Filtrar(permisos, tipo, estado);
+        if (query == null) return error!;
+        // Las fechas se eligen en hora de Chile; en la base están en UTC.
+        if (desde.HasValue)
+        {
+            var inicio = InicioDelDiaUtc(desde.Value);
+            query = query.Where(s => s.FechaCreacion >= inicio);
+        }
+        if (hasta.HasValue)
+        {
+            var fin = InicioDelDiaUtc(hasta.Value.AddDays(1));
+            query = query.Where(s => s.FechaCreacion < fin);
+        }
+
+        var filas = await query
+            .OrderByDescending(s => s.FechaCreacion)
+            .Take(Reporte.MaxFilas + 1)
+            .Select(s => new
+            {
+                s.Id, s.Tipo, s.Estado, s.FechaCreacion, s.FechaVencimientoSLA, s.MotivoRechazo,
+                TrabajadorNombre = s.TrabajadorId != null
+                    ? s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido
+                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
+                        .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault(),
+                Rut = s.TrabajadorId != null ? s.Trabajador!.Rut : null,
+                AreaNombre = s.TrabajadorId != null
+                    ? s.Trabajador!.Area!.Nombre
+                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id).Select(v => v.Departamento).FirstOrDefault(),
+                CreadoPorNombre = s.CreadoPor!.Trabajador!.PrimerNombre + " " + s.CreadoPor.Trabajador.PrimerApellido,
+                // Si ya está cerrada (Completada o Rechazada), la fecha del último paso de su historial.
+                Cierre = s.Estado == Completada || s.Estado == Rechazada
+                    ? _context.HistorialSolicitudes.Where(h => h.SolicitudId == s.Id).Max(h => (DateTime?)h.Fecha)
+                    : null
+            })
+            .ToListAsync();
+        if (filas.Count > Reporte.MaxFilas) return DescargaReporte.DemasiadasFilas(this);
+
+        var ahora = DateTime.UtcNow;
+        var filtros = new List<string>();
+        if (!VeTodas(permisos)) filtros.Add("Solo mis solicitudes");
+        if (!string.IsNullOrWhiteSpace(tipo)) filtros.Add("Tipo: " + TipoADb(tipo));
+        if (!string.IsNullOrWhiteSpace(estado))
+            filtros.Add("Estado: " + (string.Equals(estado.Trim(), "Abiertas", StringComparison.OrdinalIgnoreCase)
+                ? "Pendientes y en proceso" : EstadoADb(estado)));
+        if (desde.HasValue) filtros.Add($"Desde: {desde:dd-MM-yyyy}");
+        if (hasta.HasValue) filtros.Add($"Hasta: {hasta:dd-MM-yyyy}");
+
+        var reporte = new Reporte
+        {
+            Titulo = "Solicitudes",
+            NombreArchivo = "solicitudes",
+            Columnas =
+            [
+                new("N°", 0.5), new("Tipo", 1), new("Estado", 0.9), new("Trabajador / proveedor", 1.7), new("RUT", 1),
+                new("Área", 1.4), new("Creada por", 1.4), new("Creada", 1.1), new("Vence SLA", 1.1),
+                new("Vencida", 0.7), new("Cerrada", 1.1), new("Motivo del rechazo", 2.2)
+            ],
+            Filas = filas.Select(f => new object?[]
+            {
+                f.Id, f.Tipo, f.Estado, f.TrabajadorNombre, f.Rut, f.AreaNombre, f.CreadoPorNombre,
+                f.FechaCreacion, f.FechaVencimientoSLA, EstaVencida(f.Estado, f.FechaVencimientoSLA, ahora) ? "Sí" : "No",
+                f.Cierre, f.MotivoRechazo
+            }).ToList(),
+            Filtros = filtros.Count == 0 ? "ninguno" : string.Join(" · ", filtros),
+            GeneradoPor = _usuario.Nombre
+        };
+        return await DescargaReporte.EntregarAsync(this, _context, _usuario, reporte, fmt);
+    }
+
+    private static DateTime InicioDelDiaUtc(DateOnly dia) =>
+        TimeZoneInfo.ConvertTimeToUtc(dia.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), HoraChile.Zona());
 
     // Detalle con historial. Lo ve quien puede ver todas las solicitudes o quien la creó; las acciones
     // de TI aparecen solo con el permiso de la Bandeja y las del creador solo a quien la creó.
