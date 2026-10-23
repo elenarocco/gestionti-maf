@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MafTi.Infrastructure;
-using MafTi.Domain;
 using MafTi.Api.Dtos;
 using MafTi.Api.Seguridad;
 
@@ -9,8 +8,8 @@ namespace MafTi.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-// Quien puede crear roles, asignar permisos o dar acceso a usuarios puede darse cualquier permiso:
-// solo Super Admin (AdministrarUsuariosYRoles).
+// Solo lectura: los roles y sus permisos se cambian con una migración revisada, no desde la app,
+// porque un cambio afecta a todos los usuarios del rol. Solo Super Admin (AdministrarUsuariosYRoles).
 [RequierePermiso("AdministrarUsuariosYRoles")]
 public class RolController : ControllerBase
 {
@@ -21,31 +20,20 @@ public class RolController : ControllerBase
         _context = context;
     }
 
+    // Roles con sus permisos y cuántos usuarios activos tienen (para asignar roles y ver qué puede hacer cada uno).
     [HttpGet]
     public async Task<ActionResult<IEnumerable<RolListaDto>>> GetAll()
     {
         return await _context.Roles
+            .OrderBy(r => r.Nombre)
             .Select(r => new RolListaDto
             {
                 Id = r.Id,
                 Nombre = r.Nombre,
-                Descripcion = r.Descripcion
+                Descripcion = r.Descripcion,
+                Permisos = _context.RolPermisos.Where(rp => rp.RolId == r.Id).Select(rp => rp.Permiso!.Codigo).ToList(),
+                UsuariosActivos = _context.UsuariosSistema.Count(u => u.RolId == r.Id && u.Activo)
             })
             .ToListAsync();
-    }
-
-    [HttpPost]
-    public async Task<ActionResult<RolListaDto>> Create(RolCreateDto dto)
-    {
-        var nuevo = new Rol
-        {
-            Nombre = dto.Nombre,
-            Descripcion = dto.Descripcion
-        };
-
-        _context.Roles.Add(nuevo);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetAll), new { id = nuevo.Id }, dto);
     }
 }
