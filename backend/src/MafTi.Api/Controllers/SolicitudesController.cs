@@ -25,11 +25,13 @@ public partial class SolicitudesController : ControllerBase
 
     private readonly AppDbContext _context;
     private readonly UsuarioActual _usuario;
+    private readonly ServicioSla _sla;
 
-    public SolicitudesController(AppDbContext context, UsuarioActual usuario)
+    public SolicitudesController(AppDbContext context, UsuarioActual usuario, ServicioSla sla)
     {
         _context = context;
         _usuario = usuario;
+        _sla = sla;
     }
 
     // ---------- Bandeja de TI ----------
@@ -349,8 +351,7 @@ public partial class SolicitudesController : ControllerBase
             Tipo = TipoVpn,
             Estado = Pendiente,
             FechaCreacion = ahora,
-            // TODO: SLA de VPN por confirmar con MAF; por ahora el mismo plazo que Ingreso y Modificación.
-            FechaVencimientoSLA = ahora.AddDays(4)
+            FechaVencimientoSLA = (await _sla.CalcularAsync(TipoVpn, ahora)).VenceUtc
         };
         _context.Solicitudes.Add(solicitud);
         await _context.SaveChangesAsync();

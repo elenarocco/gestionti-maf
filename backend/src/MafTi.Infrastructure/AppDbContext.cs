@@ -107,6 +107,12 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
         e.Property(x => x.Accion).HasMaxLength(50);
         e.Property(x => x.Detalle).HasMaxLength(500);
     });
+
+    modelBuilder.Entity<Feriado>(e =>
+    {
+        e.HasIndex(x => x.Fecha).IsUnique();
+        e.Property(x => x.Nombre).HasMaxLength(100);
+    });
 }
 
     public DbSet<Trabajador> Trabajadores { get; set; }
@@ -124,4 +130,5 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<SolicitudVpn> SolicitudesVpn => Set<SolicitudVpn>();
     public DbSet<RegistroDescarga> RegistrosDescarga => Set<RegistroDescarga>();
     public DbSet<CambioUsuarioSistema> CambiosUsuarioSistema => Set<CambioUsuarioSistema>();
+    public DbSet<Feriado> Feriados => Set<Feriado>();
 }

@@ -122,6 +122,30 @@ namespace MafTi.Infrastructure.Migrations
                     b.ToTable("Catalogos");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.Feriado", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("Fecha")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Fecha")
+                        .IsUnique();
+
+                    b.ToTable("Feriados");
+                });
+
             modelBuilder.Entity("MafTi.Domain.HistorialSolicitud", b =>
                 {
                     b.Property<int>("Id")
