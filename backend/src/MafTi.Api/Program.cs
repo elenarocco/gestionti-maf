@@ -57,6 +57,17 @@ using (var scope = app.Services.CreateScope())
 }
 app.UsarSeguridadHttp();
 
+// Cualquier error no controlado se registra en el servidor y al cliente solo le llega un JSON genérico:
+// nunca un stack trace ni detalles internos, sin importar el entorno.
+app.UseExceptionHandler(builder => builder.Run(async context =>
+{
+    var ex = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>()?.Error;
+    app.Logger.LogError(ex, "Error no controlado en {Ruta}", context.Request.Path);
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    context.Response.ContentType = "application/json";
+    await context.Response.WriteAsJsonAsync(new { error = "Ocurrió un error inesperado. Inténtalo de nuevo o avisa a TI." });
+}));
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
