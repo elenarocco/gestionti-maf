@@ -107,5 +107,7 @@ public class SolicitudVpnDetalleDto
     public DateTime FechaCreacion { get; set; }
     public DateTime? FechaEnvioProveedor { get; set; }
     public FichaVpnDto? Ficha { get; set; }
+    // true si quien consulta puede completar la ficha ahora (la creó, TI la habilitó y sigue Pendiente).
+    public bool FichaEditable { get; set; }
     public List<HistorialItemDto> Historial { get; set; } = new();
 }

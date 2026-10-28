@@ -428,6 +428,7 @@ public partial class SolicitudesController : ControllerBase
             FechaCreacion = s.FechaCreacion,
             FechaEnvioProveedor = vpn.FechaEnvioProveedor,
             Ficha = AFicha(vpn),
+            FichaEditable = esCreador && FlujoSolicitud.PuedeCompletarFicha(Situacion(s, vpn)),
             Historial = await HistorialAsync(s.Id)
         };
     }
