@@ -21,11 +21,12 @@ public class AccesosVpnController : ControllerBase
         _context = context;
     }
 
+    // Estado = Vigente | PorVencer | Vencido y DiasRestantes los calcula ReglasVpn: el frontend solo los muestra.
     public record AccesoVpnDto(int Id, int SolicitudId, string Rut, string Nombre, string? Cargo, string? CompaniaExterna,
-        string? Departamento, string? CuentaCorreo, string Motivo, DateOnly? FechaDesde, DateOnly? FechaHasta, bool Vigente,
-        DateTime FechaRegistro);
+        string? Departamento, string? CuentaCorreo, string Motivo, DateOnly? FechaDesde, DateOnly? FechaHasta,
+        string Estado, int? DiasRestantes, DateTime FechaRegistro);
 
-    // estado = Vigentes (por defecto) | Vencidos | Todos. Vigente = sin fecha de término o con término desde hoy en adelante.
+    // estado = Vigentes (por defecto; incluye los por vencer) | Vencidos | Todos.
     [HttpGet]
     public async Task<ActionResult<PaginacionResultado<AccesoVpnDto>>> GetAll(
         string? q = null, string estado = "Vigentes", int pagina = 1, int tamanoPagina = 20)
@@ -47,13 +48,22 @@ public class AccesosVpnController : ControllerBase
                 EF.Functions.ILike(a.CompaniaExterna ?? "", patron));
         }
 
-        var resultado = await query
+        var pagina_ = await query
             .OrderBy(a => a.FechaHasta == null).ThenBy(a => a.FechaHasta).ThenBy(a => a.Id)
-            .Select(a => new AccesoVpnDto(a.Id, a.SolicitudId, a.Rut, a.Nombres + " " + a.Apellidos, a.Cargo, a.CompaniaExterna,
-                a.Departamento, a.CuentaCorreo, a.Motivo, a.FechaDesde, a.FechaHasta,
-                a.FechaHasta == null || a.FechaHasta >= hoy, a.FechaRegistro))
             .PaginarAsync(pagina, tamanoPagina);
 
-        return Ok(resultado);
+        return Ok(new PaginacionResultado<AccesoVpnDto>
+        {
+            Total = pagina_.Total,
+            Pagina = pagina_.Pagina,
+            TamanoPagina = pagina_.TamanoPagina,
+            Datos = pagina_.Datos.Select(a =>
+            {
+                var situacion = ReglasVpn.Calcular(a.FechaHasta, hoy);
+                return new AccesoVpnDto(a.Id, a.SolicitudId, a.Rut, a.Nombres + " " + a.Apellidos, a.Cargo, a.CompaniaExterna,
+                    a.Departamento, a.CuentaCorreo, a.Motivo, a.FechaDesde, a.FechaHasta,
+                    situacion.Estado, situacion.DiasRestantes, a.FechaRegistro);
+            }).ToList()
+        });
     }
 }
