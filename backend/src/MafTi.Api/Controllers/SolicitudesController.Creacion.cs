@@ -33,10 +33,46 @@ public partial class SolicitudesController
         return new PlazoSlaDto { Regla = p.Regla, Inicio = p.InicioUtc, Vence = p.VenceUtc, Mensaje = p.Mensaje };
     }
 
+    // Datos de un Ingreso para precargar el formulario al corregirlo (solo quien lo creó). Salen de la solicitud,
+    // porque el trabajador no existe hasta completarla; en los Ingresos antiguos, del trabajador.
+    [HttpGet("{id:int}/datos-ingreso")]
+    [RequierePermiso("CrearSolicitudIngreso")]
+    public async Task<ActionResult<IngresoCreateDto>> DatosIngreso(int id)
+    {
+        var s = await _context.Solicitudes.Include(x => x.Trabajador).FirstOrDefaultAsync(x => x.Id == id && x.Tipo == "Ingreso");
+        if (s == null) return NotFound(new { error = "La solicitud no existe." });
+        if (s.CreadoPorId != _usuario.Id) return StatusCode(403, new { error = "Solo quien creó la solicitud puede ver sus datos para corregirla." });
+
+        var accesos = await _context.SolicitudDetalles.Where(d => d.SolicitudId == id && d.Accion == "Agregar").Select(d => d.CatalogoId).ToListAsync();
+        var i = await _context.SolicitudesIngreso.FirstOrDefaultAsync(x => x.SolicitudId == id);
+        if (i != null)
+            return new IngresoCreateDto
+            {
+                Rut = i.Rut, PrimerNombre = i.PrimerNombre, SegundoNombre = i.SegundoNombre, PrimerApellido = i.PrimerApellido,
+                SegundoApellido = i.SegundoApellido, FechaNacimiento = i.FechaNacimiento, Sexo = i.Sexo, Correo = i.Correo,
+                DireccionCorporativaId = i.DireccionCorporativaId, AreaId = i.AreaId, CargoId = i.CargoId, LugarTrabajoId = i.LugarTrabajoId,
+                FechaIncorporacion = i.FechaIncorporacion, DireccionDomicilio = i.DireccionDomicilio, JefeDirecto = i.JefeDirecto,
+                HomologarAccesosDesde = i.HomologarAccesosDesde, TieneTelefonoCorporativo = i.TieneTelefonoCorporativo,
+                SolicitaTelefono = i.SolicitaTelefono, CatalogoIds = accesos
+            };
+        if (s.Trabajador is not Trabajador t) return NotFound(new { error = "La solicitud no tiene los datos del trabajador." });
+        return new IngresoCreateDto
+        {
+            Rut = t.Rut, PrimerNombre = t.PrimerNombre, SegundoNombre = t.SegundoNombre, PrimerApellido = t.PrimerApellido,
+            SegundoApellido = t.SegundoApellido, FechaNacimiento = t.FechaNacimiento, Sexo = t.Sexo, Correo = t.Correo,
+            DireccionCorporativaId = t.DireccionCorporativaId, AreaId = t.AreaId, CargoId = t.CargoId, LugarTrabajoId = t.LugarTrabajoId,
+            FechaIncorporacion = t.FechaIncorporacion, DireccionDomicilio = t.DireccionDomicilio, JefeDirecto = t.JefeDirecto,
+            HomologarAccesosDesde = t.HomologarAccesosDesde, TieneTelefonoCorporativo = t.TieneTelefonoCorporativo,
+            SolicitaTelefono = t.SolicitaTelefono, CatalogoIds = accesos
+        };
+    }
+
     [HttpPost("ingreso")]
     [RequierePermiso("CrearSolicitudIngreso")]
     public async Task<ActionResult<IngresoResultadoDto>> CrearIngreso(IngresoCreateDto dto)
     {
+        // El trabajador NO se crea aquí: sus datos quedan en la solicitud (SolicitudesIngreso) y se crea en
+        // Trabajadores recién cuando TI completa la solicitud. Este objeto solo sirve para validar.
         var nuevoTrabajador = new Trabajador
         {
             Rut = TrabajadorValidator.FormatearParaGuardar(dto.Rut),
@@ -73,19 +109,26 @@ public partial class SolicitudesController
         if (await ValidarOrigenAsync(dto.SolicitudOrigenId, "Ingreso", rut: nuevoTrabajador.Rut) is string errorOrigenIngreso)
             errores.Add(errorOrigenIngreso);
 
+        // Mientras un Ingreso está abierto la persona aún no existe en Trabajadores: se revisa aparte que no
+        // haya otro Ingreso abierto para el mismo RUT o el mismo correo.
+        var correoNuevo = nuevoTrabajador.Correo.ToLower();
+        var ingresosAbiertos = _context.SolicitudesIngreso
+            .Where(i => i.Solicitud!.Estado == SolicitudValores.Pendiente || i.Solicitud.Estado == SolicitudValores.EnProceso);
+        if (await ingresosAbiertos.AnyAsync(i => i.Rut == nuevoTrabajador.Rut))
+            errores.Add("Ya hay una solicitud de Ingreso abierta para ese RUT.");
+        else if (await ingresosAbiertos.AnyAsync(i => i.Correo.ToLower() == correoNuevo))
+            errores.Add("Ya hay una solicitud de Ingreso abierta con ese correo.");
+
         if (errores.Any())
         {
             return BadRequest(new { errores });
         }
         using var transaccion = await _context.Database.BeginTransactionAsync();
 
-        _context.Trabajadores.Add(nuevoTrabajador);
-        await _context.SaveChangesAsync();
-
         var ahoraIngreso = DateTime.UtcNow;
         var nuevaSolicitud = new Solicitud
         {
-            TrabajadorId = nuevoTrabajador.Id,
+            TrabajadorId = null,   // se asigna al completar, cuando se crea el trabajador
             CreadoPorId = _usuario.Id,
             SolicitudOrigenId = dto.SolicitudOrigenId,
             Tipo = "Ingreso",
@@ -97,7 +140,21 @@ public partial class SolicitudesController
         _context.Solicitudes.Add(nuevaSolicitud);
         await _context.SaveChangesAsync();
 
-        foreach (var catalogoId in dto.CatalogoIds)
+        var t = nuevoTrabajador;
+        _context.SolicitudesIngreso.Add(new SolicitudIngreso
+        {
+            SolicitudId = nuevaSolicitud.Id,
+            Rut = t.Rut, PrimerNombre = t.PrimerNombre, SegundoNombre = t.SegundoNombre,
+            PrimerApellido = t.PrimerApellido, SegundoApellido = t.SegundoApellido,
+            FechaNacimiento = t.FechaNacimiento, Sexo = t.Sexo, Correo = t.Correo,
+            DireccionCorporativaId = t.DireccionCorporativaId, AreaId = t.AreaId, CargoId = t.CargoId,
+            LugarTrabajoId = t.LugarTrabajoId, FechaIncorporacion = t.FechaIncorporacion,
+            DireccionDomicilio = t.DireccionDomicilio, JefeDirecto = t.JefeDirecto,
+            HomologarAccesosDesde = t.HomologarAccesosDesde,
+            TieneTelefonoCorporativo = t.TieneTelefonoCorporativo, SolicitaTelefono = t.SolicitaTelefono
+        });
+
+        foreach (var catalogoId in dto.CatalogoIds.Distinct())
         {
             _context.SolicitudDetalles.Add(new SolicitudDetalle
             {
@@ -120,7 +177,7 @@ public partial class SolicitudesController
         
         return Ok(new IngresoResultadoDto
         {
-                TrabajadorId = nuevoTrabajador.Id,
+                TrabajadorId = null,
                 SolicitudId = nuevaSolicitud.Id,
                 FechaVencimientoSLA = nuevaSolicitud.FechaVencimientoSLA
         });
@@ -397,18 +454,21 @@ public partial class SolicitudesController
     // ---------- Corrección de solicitudes rechazadas (adaptado de b5e1422, feature/ariel) ----------
 
     // La corrección es una solicitud nueva enlazada a la original (que sigue Rechazada, sin reabrirse).
-    // Solo la corrige quien la creó. En Ingreso se compara el RUT, porque cada Ingreso crea su propio trabajador.
+    // Solo la corrige quien la creó. En Ingreso se compara el RUT: el trabajador no existe hasta completarlo.
     private async Task<string?> ValidarOrigenAsync(int? origenId, string tipo, int? trabajadorId = null, string? rut = null)
     {
         if (origenId == null) return null;
 
         var origen = await _context.Solicitudes.Include(x => x.Trabajador).FirstOrDefaultAsync(x => x.Id == origenId);
+        var rutOrigen = rut == null ? null
+            : await _context.SolicitudesIngreso.Where(i => i.SolicitudId == origenId).Select(i => i.Rut).FirstOrDefaultAsync()
+              ?? origen?.Trabajador?.Rut;
         if (origen == null) return "La solicitud a corregir no existe.";
         if (origen.CreadoPorId != _usuario.Id) return "Solo quien creó la solicitud puede corregirla.";
         if (origen.Tipo != tipo) return "La corrección debe ser del mismo tipo que la solicitud original.";
         if (origen.Estado != "Rechazada") return "Solo se puede corregir una solicitud Rechazada.";
         if (trabajadorId.HasValue && origen.TrabajadorId != trabajadorId) return "La corrección debe ser para el mismo trabajador.";
-        if (rut != null && origen.Trabajador?.Rut != rut) return "La corrección debe ser para el mismo trabajador (mismo RUT).";
+        if (rut != null && rutOrigen != rut) return "La corrección debe ser para el mismo trabajador (mismo RUT).";
         if (await _context.Solicitudes.AnyAsync(x => x.SolicitudOrigenId == origenId)) return "Esa solicitud ya fue corregida.";
         return null;
     }

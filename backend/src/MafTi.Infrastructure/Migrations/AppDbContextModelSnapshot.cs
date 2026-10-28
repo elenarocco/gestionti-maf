@@ -57,6 +57,68 @@ namespace MafTi.Infrastructure.Migrations
                     b.ToTable("Accesos");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.AccesoVpn", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Apellidos")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Cargo")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CompaniaExterna")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CuentaCorreo")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Departamento")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly?>("FechaDesde")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("FechaHasta")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("FechaRegistro")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Nombres")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Rut")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("SolicitudId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FechaHasta");
+
+                    b.HasIndex("SolicitudId")
+                        .IsUnique();
+
+                    b.ToTable("AccesosVpn");
+                });
+
             modelBuilder.Entity("MafTi.Domain.CambioUsuarioSistema", b =>
                 {
                     b.Property<int>("Id")
@@ -397,6 +459,86 @@ namespace MafTi.Infrastructure.Migrations
                     b.ToTable("SolicitudDetalles");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.SolicitudIngreso", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AreaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CargoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Correo")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("DireccionCorporativaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DireccionDomicilio")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly>("FechaIncorporacion")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("FechaNacimiento")
+                        .HasColumnType("date");
+
+                    b.Property<string>("HomologarAccesosDesde")
+                        .HasColumnType("text");
+
+                    b.Property<string>("JefeDirecto")
+                        .HasColumnType("text");
+
+                    b.Property<int>("LugarTrabajoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PrimerApellido")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PrimerNombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Rut")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("SegundoApellido")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SegundoNombre")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Sexo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("SolicitaTelefono")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SolicitudId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("TieneTelefonoCorporativo")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SolicitudId")
+                        .IsUnique();
+
+                    b.ToTable("SolicitudesIngreso");
+                });
+
             modelBuilder.Entity("MafTi.Domain.SolicitudModificacion", b =>
                 {
                     b.Property<int>("Id")
@@ -697,6 +839,17 @@ namespace MafTi.Infrastructure.Migrations
                     b.Navigation("Trabajador");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.AccesoVpn", b =>
+                {
+                    b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
+                        .WithOne()
+                        .HasForeignKey("MafTi.Domain.AccesoVpn", "SolicitudId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Solicitud");
+                });
+
             modelBuilder.Entity("MafTi.Domain.CambioUsuarioSistema", b =>
                 {
                     b.HasOne("MafTi.Domain.UsuarioSistema", "RealizadoPor")
@@ -825,6 +978,17 @@ namespace MafTi.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Catalogo");
+
+                    b.Navigation("Solicitud");
+                });
+
+            modelBuilder.Entity("MafTi.Domain.SolicitudIngreso", b =>
+                {
+                    b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
+                        .WithOne()
+                        .HasForeignKey("MafTi.Domain.SolicitudIngreso", "SolicitudId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Solicitud");
                 });

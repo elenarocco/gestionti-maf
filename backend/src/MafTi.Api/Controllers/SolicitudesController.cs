@@ -62,13 +62,21 @@ public partial class SolicitudesController : ControllerBase
             {
                 s.Id, s.Tipo, s.Estado, s.FechaCreacion, s.FechaVencimientoSLA, s.TrabajadorId, s.CreadoPorId, s.MotivoRechazo,
                 // VPN no tiene trabajador: se muestra el proveedor de la ficha cuando ya existe.
+                // Sin trabajador: un Ingreso aún no completado (sus datos están en la solicitud) o una VPN (el proveedor).
                 TrabajadorNombre = s.TrabajadorId != null
                     ? s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido
-                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
-                        .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault(),
+                    : s.Tipo == TipoIngreso
+                        ? _context.SolicitudesIngreso.Where(i => i.SolicitudId == s.Id)
+                            .Select(i => i.PrimerNombre + " " + i.PrimerApellido).FirstOrDefault()
+                        : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
+                            .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault(),
                 AreaNombre = s.TrabajadorId != null
                     ? s.Trabajador!.Area!.Nombre
-                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id).Select(v => v.Departamento).FirstOrDefault(),
+                    : s.Tipo == TipoIngreso
+                        ? _context.SolicitudesIngreso.Where(i => i.SolicitudId == s.Id)
+                            .Select(i => _context.Catalogos.Where(c => c.Id == i.AreaId).Select(c => c.Nombre).FirstOrDefault())
+                            .FirstOrDefault()
+                        : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id).Select(v => v.Departamento).FirstOrDefault(),
                 CreadoPorNombre = s.CreadoPor!.Trabajador!.PrimerNombre + " " + s.CreadoPor.Trabajador.PrimerApellido,
                 YaCorregida = _context.Solicitudes.Any(x => x.SolicitudOrigenId == s.Id),
                 Vpn = _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id)
@@ -159,14 +167,23 @@ public partial class SolicitudesController : ControllerBase
             .Select(s => new
             {
                 s.Id, s.Tipo, s.Estado, s.FechaCreacion, s.FechaVencimientoSLA, s.MotivoRechazo,
+                // Sin trabajador: un Ingreso aún no completado (sus datos están en la solicitud) o una VPN (el proveedor).
                 TrabajadorNombre = s.TrabajadorId != null
                     ? s.Trabajador!.PrimerNombre + " " + s.Trabajador.PrimerApellido
-                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
-                        .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault(),
-                Rut = s.TrabajadorId != null ? s.Trabajador!.Rut : null,
+                    : s.Tipo == TipoIngreso
+                        ? _context.SolicitudesIngreso.Where(i => i.SolicitudId == s.Id)
+                            .Select(i => i.PrimerNombre + " " + i.PrimerApellido).FirstOrDefault()
+                        : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id && v.Nombres != null)
+                            .Select(v => v.Nombres + " " + v.Apellidos).FirstOrDefault(),
+                Rut = s.TrabajadorId != null ? s.Trabajador!.Rut
+                    : _context.SolicitudesIngreso.Where(i => i.SolicitudId == s.Id).Select(i => i.Rut).FirstOrDefault(),
                 AreaNombre = s.TrabajadorId != null
                     ? s.Trabajador!.Area!.Nombre
-                    : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id).Select(v => v.Departamento).FirstOrDefault(),
+                    : s.Tipo == TipoIngreso
+                        ? _context.SolicitudesIngreso.Where(i => i.SolicitudId == s.Id)
+                            .Select(i => _context.Catalogos.Where(c => c.Id == i.AreaId).Select(c => c.Nombre).FirstOrDefault())
+                            .FirstOrDefault()
+                        : _context.SolicitudesVpn.Where(v => v.SolicitudId == s.Id).Select(v => v.Departamento).FirstOrDefault(),
                 CreadoPorNombre = s.CreadoPor!.Trabajador!.PrimerNombre + " " + s.CreadoPor.Trabajador.PrimerApellido,
                 // Si ya está cerrada (Completada o Rechazada), la fecha del último paso de su historial.
                 Cierre = s.Estado == Completada || s.Estado == Rechazada
@@ -251,7 +268,9 @@ public partial class SolicitudesController : ControllerBase
             CreadoPorNombre = NombreDe(s.CreadoPor?.Trabajador),
             TrabajadorId = s.TrabajadorId,
             TrabajadorNombre = s.Trabajador != null ? NombreDe(s.Trabajador)
-                : vpn?.Nombres != null ? $"{vpn.Nombres} {vpn.Apellidos}" : null,
+                : vpn?.Nombres != null ? $"{vpn.Nombres} {vpn.Apellidos}"
+                : await _context.SolicitudesIngreso.Where(i => i.SolicitudId == s.Id)
+                    .Select(i => i.PrimerNombre + " " + i.PrimerApellido).FirstOrDefaultAsync(),
             Detalle = await DetallePorTipoAsync(s),
             Vpn = vpn == null ? null : new VpnResumenDto
             {
@@ -310,8 +329,16 @@ public partial class SolicitudesController : ControllerBase
         if (accion == FlujoSolicitud.Tomar && vpn != null) vpn.FormularioHabilitado = true;
         if (accion == FlujoSolicitud.ConfirmarEnvio && vpn != null) vpn.FechaEnvioProveedor = ahora;
         if (esRechazo) s.MotivoRechazo = justificacion!.Trim();
-        var comentario = esRechazo ? s.MotivoRechazo
-            : accion == FlujoSolicitud.Completar && s.Tipo == TipoBloqueo ? await AplicarBloqueoAsync(s) : null;
+
+        // Nada se escribe en Trabajadores, Accesos ni el registro VPN hasta que TI completa la solicitud.
+        // Si el cambio no se puede aplicar, la solicitud no se completa (no se guarda nada) y TI ve el motivo.
+        string? comentario = esRechazo ? s.MotivoRechazo : null;
+        if (accion is FlujoSolicitud.Completar or FlujoSolicitud.ConfirmarEnvio)
+        {
+            var (texto, errorAplicar) = await AplicarAlCompletarAsync(s, vpn, ahora);
+            if (errorAplicar != null) return Conflict(new { error = errorAplicar });
+            comentario = texto;
+        }
 
         _context.HistorialSolicitudes.Add(new HistorialSolicitud
         {
@@ -457,6 +484,123 @@ public partial class SolicitudesController : ControllerBase
 
     // Bloqueo completado: el trabajador queda inactivo en nuestra base (con su fecha de salida), para que
     // la dotación esté al día. Un bloqueo temporal no lo inactiva. Devuelve el comentario para el historial.
+    // ---------- Efecto en la base al completar ----------
+
+    private async Task<(string? Comentario, string? Error)> AplicarAlCompletarAsync(Solicitud s, SolicitudVpn? vpn, DateTime ahora) =>
+        s.Tipo switch
+        {
+            TipoIngreso => await AplicarIngresoAsync(s, ahora),
+            TipoModificacion => await AplicarModificacionAsync(s, ahora),
+            TipoBloqueo => (await AplicarBloqueoAsync(s), null),
+            TipoVpn => await RegistrarAccesoVpnAsync(s, vpn, ahora),
+            _ => (null, null)
+        };
+
+    // Ingreso: el trabajador se crea recién ahora, con los datos guardados en la solicitud, y recibe los accesos pedidos.
+    private async Task<(string?, string?)> AplicarIngresoAsync(Solicitud s, DateTime ahora)
+    {
+        Trabajador trabajador;
+        if (s.TrabajadorId is int existente)
+        {
+            // Ingresos creados antes de este cambio: el trabajador ya existía; solo se asegura que quede activo.
+            trabajador = (await _context.Trabajadores.FindAsync(existente))!;
+            trabajador.Activo = true;
+        }
+        else
+        {
+            var d = await _context.SolicitudesIngreso.FirstOrDefaultAsync(i => i.SolicitudId == s.Id);
+            if (d == null) return (null, "La solicitud no tiene los datos del trabajador.");
+
+            // Se revisa de nuevo: alguien pudo ingresar a la misma persona mientras la solicitud estaba abierta.
+            if (await _context.Trabajadores.AnyAsync(t => t.Rut == d.Rut && t.Activo))
+                return (null, $"Ya existe un trabajador activo con el RUT {d.Rut}: revisa si ya fue ingresado antes de completar.");
+            var correo = d.Correo.ToLower();
+            if (await _context.Trabajadores.AnyAsync(t => t.Correo.ToLower() == correo && !(t.Rut == d.Rut && !t.Activo)))
+                return (null, $"El correo {d.Correo} ya lo usa otro trabajador: no se puede crear.");
+
+            trabajador = new Trabajador
+            {
+                Rut = d.Rut, PrimerNombre = d.PrimerNombre, SegundoNombre = d.SegundoNombre,
+                PrimerApellido = d.PrimerApellido, SegundoApellido = d.SegundoApellido,
+                FechaNacimiento = d.FechaNacimiento, Sexo = d.Sexo, Correo = d.Correo,
+                DireccionCorporativaId = d.DireccionCorporativaId, AreaId = d.AreaId, CargoId = d.CargoId,
+                LugarTrabajoId = d.LugarTrabajoId, FechaIncorporacion = d.FechaIncorporacion,
+                DireccionDomicilio = d.DireccionDomicilio, JefeDirecto = d.JefeDirecto,
+                HomologarAccesosDesde = d.HomologarAccesosDesde,
+                TieneTelefonoCorporativo = d.TieneTelefonoCorporativo, SolicitaTelefono = d.SolicitaTelefono,
+                Activo = true
+            };
+            _context.Trabajadores.Add(trabajador);
+            s.Trabajador = trabajador;
+        }
+
+        var agregados = await AplicarAccesosAsync(s, trabajador, ahora);
+        return ($"Trabajador creado en la base como activo. Accesos otorgados: {agregados.Agregados}.", null);
+    }
+
+    // Modificación: los datos propuestos pasan a la ficha del trabajador y se agregan o quitan los accesos pedidos.
+    private async Task<(string?, string?)> AplicarModificacionAsync(Solicitud s, DateTime ahora)
+    {
+        var m = await _context.SolicitudesModificacion.FirstOrDefaultAsync(x => x.SolicitudId == s.Id);
+        var t = s.TrabajadorId == null ? null : await _context.Trabajadores.FindAsync(s.TrabajadorId);
+        if (m == null || t == null) return (null, "La solicitud no tiene los datos de la modificación.");
+        if (!t.Activo) return (null, "El trabajador ya no está activo: no se pueden aplicar los cambios.");
+
+        var correo = m.Correo.ToLower();
+        if (correo != t.Correo.ToLower() && await _context.Trabajadores.AnyAsync(x => x.Id != t.Id && x.Correo.ToLower() == correo))
+            return (null, $"El correo {m.Correo} ya lo usa otro trabajador: no se puede aplicar el cambio.");
+
+        t.PrimerNombre = m.PrimerNombre; t.SegundoNombre = m.SegundoNombre;
+        t.PrimerApellido = m.PrimerApellido; t.SegundoApellido = m.SegundoApellido;
+        t.FechaNacimiento = m.FechaNacimiento; t.Sexo = m.Sexo; t.Correo = m.Correo;
+        t.DireccionCorporativaId = m.DireccionCorporativaId; t.AreaId = m.AreaId; t.CargoId = m.CargoId;
+        t.LugarTrabajoId = m.LugarTrabajoId; t.FechaIncorporacion = m.FechaIncorporacion;
+        t.DireccionDomicilio = m.DireccionDomicilio; t.JefeDirecto = m.JefeDirecto;
+        t.HomologarAccesosDesde = m.HomologarAccesosDesde;
+        t.TieneTelefonoCorporativo = m.TieneTelefonoCorporativo; t.SolicitaTelefono = m.SolicitaTelefono;
+
+        var (agregados, quitados) = await AplicarAccesosAsync(s, t, ahora);
+        return ($"Cambios aplicados a la ficha del trabajador. Accesos agregados: {agregados}, quitados: {quitados}.", null);
+    }
+
+    // Agrega y quita los sistemas y carpetas pedidos en la solicitud (ReglasAccesos decide qué corresponde).
+    private async Task<(int Agregados, int Quitados)> AplicarAccesosAsync(Solicitud s, Trabajador t, DateTime ahora)
+    {
+        var pedidos = await _context.SolicitudDetalles.Where(d => d.SolicitudId == s.Id)
+            .Select(d => new { d.CatalogoId, d.Accion }).ToListAsync();
+        var activos = t.Id == 0 ? new List<Acceso>()
+            : await _context.Accesos.Where(a => a.TrabajadorId == t.Id && a.Estado == "Activo").ToListAsync();
+
+        var cambios = ReglasAccesos.Calcular(
+            activos.Select(a => a.CatalogoId),
+            pedidos.Where(p => p.Accion == "Agregar").Select(p => p.CatalogoId),
+            pedidos.Where(p => p.Accion == "Quitar").Select(p => p.CatalogoId));
+
+        foreach (var catalogoId in cambios.Agregar)
+            _context.Accesos.Add(new Acceso { Trabajador = t, CatalogoId = catalogoId, SolicitudId = s.Id, FechaOtorgado = ahora, Estado = "Activo" });
+        foreach (var acceso in activos.Where(a => cambios.Quitar.Contains(a.CatalogoId)))
+            acceso.Estado = "Quitado";
+
+        return (cambios.Agregar.Count, cambios.Quitar.Count);
+    }
+
+    // VPN: al confirmar el envío al proveedor, el acceso queda en el registro de accesos VPN.
+    private async Task<(string?, string?)> RegistrarAccesoVpnAsync(Solicitud s, SolicitudVpn? v, DateTime ahora)
+    {
+        if (v == null || v.Nombres == null) return (null, "La solicitud no tiene la ficha del proveedor.");
+        if (await _context.AccesosVpn.AnyAsync(a => a.SolicitudId == s.Id)) return (null, null);
+
+        var motivo = await _context.Catalogos.Where(c => c.Id == v.MotivoId).Select(c => c.Nombre).FirstOrDefaultAsync() ?? "";
+        _context.AccesosVpn.Add(new AccesoVpn
+        {
+            SolicitudId = s.Id, Rut = v.Rut ?? "", Nombres = v.Nombres, Apellidos = v.Apellidos ?? "",
+            Cargo = v.Cargo, CompaniaExterna = v.CompaniaExterna, Departamento = v.Departamento,
+            CuentaCorreo = v.CuentaCorreo, Motivo = motivo,
+            FechaDesde = v.FechaIncorporacion, FechaHasta = v.FechaCaducidad, FechaRegistro = ahora
+        });
+        return ($"Acceso VPN registrado{(v.FechaCaducidad is DateOnly h ? $" hasta el {h:dd-MM-yyyy}" : "")}.", null);
+    }
+
     private async Task<string?> AplicarBloqueoAsync(Solicitud s)
     {
         var bloqueo = await _context.SolicitudesBloqueo.FirstOrDefaultAsync(b => b.SolicitudId == s.Id);
@@ -507,6 +651,33 @@ public partial class SolicitudesController : ControllerBase
     // Datos propios de cada tipo, con nombres en lugar de ids de catálogo.
     private async Task<Dictionary<string, object?>?> DetallePorTipoAsync(Solicitud s)
     {
+        if (s.Tipo == TipoIngreso && await _context.SolicitudesIngreso.FirstOrDefaultAsync(x => x.SolicitudId == s.Id) is SolicitudIngreso i)
+        {
+            var ids = new[] { i.DireccionCorporativaId, i.AreaId, i.CargoId, i.LugarTrabajoId };
+            var nombres = await _context.Catalogos.Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Nombre);
+            return new()
+            {
+                ["rut"] = i.Rut,
+                ["primerNombre"] = i.PrimerNombre,
+                ["segundoNombre"] = i.SegundoNombre,
+                ["primerApellido"] = i.PrimerApellido,
+                ["segundoApellido"] = i.SegundoApellido,
+                ["fechaNacimiento"] = i.FechaNacimiento,
+                ["sexo"] = i.Sexo,
+                ["correo"] = i.Correo,
+                ["direccionCorporativa"] = nombres.GetValueOrDefault(i.DireccionCorporativaId),
+                ["area"] = nombres.GetValueOrDefault(i.AreaId),
+                ["cargo"] = nombres.GetValueOrDefault(i.CargoId),
+                ["lugarTrabajo"] = nombres.GetValueOrDefault(i.LugarTrabajoId),
+                ["fechaIncorporacion"] = i.FechaIncorporacion,
+                ["jefeDirecto"] = i.JefeDirecto,
+                ["homologarAccesosDesde"] = i.HomologarAccesosDesde,
+                ["tieneTelefonoCorporativo"] = i.TieneTelefonoCorporativo,
+                ["solicitaTelefono"] = i.SolicitaTelefono,
+                ["accesosSolicitados"] = await NombresAccesosAsync(s.Id, "Agregar")
+            };
+        }
+
         if (s.Tipo == TipoIngreso && s.Trabajador is Trabajador t)
         {
             var accesos = await NombresAccesosAsync(s.Id, "Agregar");
