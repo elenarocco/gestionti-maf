@@ -81,13 +81,12 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 });
 
     // TrabajadorId es opcional: VPN no tiene trabajador, y un Ingreso no lo tiene hasta completarse.
-    // Se mantiene el borrado en cascada que ya tenía.
     modelBuilder.Entity<Solicitud>()
         .HasOne(s => s.Trabajador)
         .WithMany()
         .HasForeignKey(s => s.TrabajadorId)
         .IsRequired(false)
-        .OnDelete(DeleteBehavior.Cascade);
+        .OnDelete(DeleteBehavior.Restrict);
 
     modelBuilder.Entity<SolicitudVpn>(e =>
 {
@@ -139,6 +138,12 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
         e.HasIndex(x => x.Fecha).IsUnique();
         e.Property(x => x.Nombre).HasMaxLength(100);
     });
+
+    // Ningún borrado se propaga: borrar un trabajador, usuario, solicitud, rol o catálogo que tenga registros
+    // asociados falla en vez de llevarse en silencio usuarios, solicitudes, historial o accesos.
+    // En este sistema nada se borra (los trabajadores se desactivan), así que no se pierde nada al exigirlo.
+    foreach (var fk in modelBuilder.Model.GetEntityTypes().SelectMany(t => t.GetForeignKeys()))
+        fk.DeleteBehavior = DeleteBehavior.Restrict;
 }
 
     public DbSet<Trabajador> Trabajadores { get; set; }

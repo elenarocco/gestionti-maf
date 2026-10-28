@@ -819,17 +819,18 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasOne("MafTi.Domain.Catalogo", "Catalogo")
                         .WithMany()
                         .HasForeignKey("CatalogoId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
                         .WithMany()
-                        .HasForeignKey("SolicitudId");
+                        .HasForeignKey("SolicitudId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("MafTi.Domain.Trabajador", "Trabajador")
                         .WithMany()
                         .HasForeignKey("TrabajadorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Catalogo");
@@ -884,13 +885,13 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasOne("MafTi.Domain.UsuarioSistema", "RealizadoPor")
                         .WithMany()
                         .HasForeignKey("RealizadoPorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
                         .WithMany()
                         .HasForeignKey("SolicitudId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("RealizadoPor");
@@ -914,13 +915,13 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasOne("MafTi.Domain.Permiso", "Permiso")
                         .WithMany()
                         .HasForeignKey("PermisoId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MafTi.Domain.Rol", "Rol")
                         .WithMany()
                         .HasForeignKey("RolId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Permiso");
@@ -933,17 +934,18 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasOne("MafTi.Domain.UsuarioSistema", "CreadoPor")
                         .WithMany()
                         .HasForeignKey("CreadoPorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MafTi.Domain.Solicitud", "SolicitudOrigen")
                         .WithMany()
-                        .HasForeignKey("SolicitudOrigenId");
+                        .HasForeignKey("SolicitudOrigenId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("MafTi.Domain.Trabajador", "Trabajador")
                         .WithMany()
                         .HasForeignKey("TrabajadorId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("CreadoPor");
 
@@ -968,13 +970,13 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasOne("MafTi.Domain.Catalogo", "Catalogo")
                         .WithMany()
                         .HasForeignKey("CatalogoId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MafTi.Domain.Solicitud", "Solicitud")
                         .WithMany()
                         .HasForeignKey("SolicitudId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Catalogo");
@@ -1028,7 +1030,7 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasOne("MafTi.Domain.Catalogo", "Area")
                         .WithMany()
                         .HasForeignKey("AreaId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MafTi.Domain.Catalogo", "Cargo")
@@ -1040,13 +1042,13 @@ namespace MafTi.Infrastructure.Migrations
                     b.HasOne("MafTi.Domain.Catalogo", "DireccionCorporativa")
                         .WithMany()
                         .HasForeignKey("DireccionCorporativaId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MafTi.Domain.Catalogo", "LugarTrabajo")
                         .WithMany()
                         .HasForeignKey("LugarTrabajoId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Area");
@@ -1062,18 +1064,19 @@ namespace MafTi.Infrastructure.Migrations
                 {
                     b.HasOne("MafTi.Domain.Catalogo", "Area")
                         .WithMany()
-                        .HasForeignKey("AreaId");
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("MafTi.Domain.Rol", "Rol")
                         .WithMany()
                         .HasForeignKey("RolId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MafTi.Domain.Trabajador", "Trabajador")
                         .WithMany()
                         .HasForeignKey("TrabajadorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Area");
