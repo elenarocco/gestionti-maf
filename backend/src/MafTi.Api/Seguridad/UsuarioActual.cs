@@ -18,7 +18,7 @@ public class UsuarioActual
     private const int SinArea = 0;   // ningún área tiene Id 0: una Jefatura sin área asignada no ve datos de nadie
 
     // Área a la que está limitado el usuario: solo Jefatura ve únicamente su área (trabajadores,
-    // solicitudes y dashboard). null = sin restricción (TI, RRHH, Auditoría, Super Admin).
+    // solicitudes y dashboard). null = sin restricción (TI, RRHH, Auditoría, Gestión General).
     public int? AreaRestringida => Rol == RolJefatura ? AreaId ?? SinArea : null;
 
     public void Establecer(int id, string correo, string nombre, int rolId, string rol, int? areaId)

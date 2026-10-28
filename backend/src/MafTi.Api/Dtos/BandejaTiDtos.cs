@@ -84,9 +84,11 @@ public class JustificacionRechazoDto
     public string? Justificacion { get; set; }
 }
 
+// Admin TI crea la VPN en un solo paso: motivo + ficha del proveedor. Queda aprobada al crearla.
 public class CrearSolicitudVpnDto
 {
     public int MotivoId { get; set; }
+    public FichaVpnDto? Ficha { get; set; }
 }
 
 public class CreadaDto

@@ -18,10 +18,10 @@ namespace MafTi.Api.Controllers;
 public partial class SolicitudesController : ControllerBase
 {
     private const string PermisoBandeja = "GestionarBandejaTI";          // solo Admin TI
-    private const string PermisoCrearVpn = "SolicitarAccesoVPN";         // Jefatura
+    private const string PermisoCrearVpn = "SolicitarAccesoVPN";         // Admin TI
     private const string PermisoFichaVpn = "CompletarFichaVPN";          // + validación de creador
     private const string PermisoPropias = "ConsultarSolicitudesPropias"; // Jefatura, RRHH
-    private const string PermisoVerTodas = "ConsultarTodasLasSolicitudes"; // Admin TI, Auditoría, Super Admin
+    private const string PermisoVerTodas = "ConsultarTodasLasSolicitudes"; // Admin TI, Auditoría, Gestión General
 
     private readonly AppDbContext _context;
     private readonly UsuarioActual _usuario;
@@ -37,7 +37,7 @@ public partial class SolicitudesController : ControllerBase
     // ---------- Bandeja de TI ----------
 
     // Una sola lista de solicitudes para todos los roles. El backend decide el alcance:
-    // quien puede ver todas (TI, Auditoría, Super Admin) las ve todas; el resto ve solo las que creó.
+    // quien puede ver todas (TI, Auditoría, Gestión General) las ve todas; el resto ve solo las que creó.
     // estado = Pendiente | EnProceso | Completada | Rechazada | Abiertas (Pendiente y En proceso).
     [HttpGet]
     public async Task<ActionResult<PaginaDto<SolicitudBandejaDto>>> Listar(
@@ -368,6 +368,12 @@ public partial class SolicitudesController : ControllerBase
         if (!motivoValido)
             return BadRequest(new { errores = new Dictionary<string, string> { ["motivoId"] = "Debe seleccionar un motivo de VPN válido." } });
 
+        // La crea TI con la ficha completa, así que no necesita una aprobación aparte: nace aprobada y con la
+        // ficha lista, a la espera de confirmar el envío al proveedor (que la completa y la deja en el registro VPN).
+        if (dto.Ficha == null) return BadRequest(new { error = "Completa la ficha del proveedor." });
+        var errores = ValidarFicha(dto.Ficha);
+        if (errores.Count > 0) return BadRequest(new { errores });
+
         var ahora = DateTime.UtcNow;
         using var transaccion = await _context.Database.BeginTransactionAsync();
 
@@ -376,18 +382,20 @@ public partial class SolicitudesController : ControllerBase
             TrabajadorId = null,
             CreadoPorId = usuarioId,
             Tipo = TipoVpn,
-            Estado = Pendiente,
+            Estado = EnProceso,
             FechaCreacion = ahora,
             FechaVencimientoSLA = (await _sla.CalcularAsync(TipoVpn, ahora)).VenceUtc
         };
         _context.Solicitudes.Add(solicitud);
         await _context.SaveChangesAsync();
 
-        _context.SolicitudesVpn.Add(new SolicitudVpn { SolicitudId = solicitud.Id, MotivoId = dto.MotivoId });
-        // TODO: notificar a TI por correo. Por ahora la solicitud aparece en la Bandeja de TI.
+        var vpn = new SolicitudVpn { SolicitudId = solicitud.Id, MotivoId = dto.MotivoId, FormularioHabilitado = true };
+        AplicarFicha(vpn, dto.Ficha);
+        _context.SolicitudesVpn.Add(vpn);
         _context.HistorialSolicitudes.Add(new HistorialSolicitud
         {
-            SolicitudId = solicitud.Id, Accion = "Creada", RealizadoPorId = usuarioId, Fecha = ahora
+            SolicitudId = solicitud.Id, Accion = "Creada", RealizadoPorId = usuarioId, Fecha = ahora,
+            Comentario = "Creada por TI con la ficha del proveedor: aprobada automáticamente."
         });
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
@@ -440,23 +448,10 @@ public partial class SolicitudesController : ControllerBase
         if (!FlujoSolicitud.PuedeCompletarFicha(Situacion(s, vpn)))
             return Conflict(new { error = "La ficha de esta solicitud no está habilitada para completarse." });
 
-        var errores = SolicitudVpnValidator.ValidarFicha(new SolicitudVpnValidator.Ficha(
-            dto.FechaIncorporacion, dto.FechaCaducidad, dto.Rut, dto.Cargo, dto.Nombres, dto.Apellidos,
-            dto.Departamento, dto.UbicacionFisica, dto.EquipoCorporativo, dto.CompaniaExterna, dto.CuentaCorreo, dto.Motivo));
+        var errores = ValidarFicha(dto);
         if (errores.Count > 0) return BadRequest(new { errores });
 
-        vpn.FechaIncorporacion = dto.FechaIncorporacion;
-        vpn.FechaCaducidad = dto.FechaCaducidad;
-        vpn.Rut = TrabajadorValidator.FormatearParaGuardar(dto.Rut!);
-        vpn.Cargo = dto.Cargo!.Trim();
-        vpn.Nombres = FormatoNombre.Normalizar(dto.Nombres);
-        vpn.Apellidos = FormatoNombre.Normalizar(dto.Apellidos);
-        vpn.Departamento = dto.Departamento!.Trim();
-        vpn.UbicacionFisica = dto.UbicacionFisica!.Trim();
-        vpn.EquipoCorporativo = dto.EquipoCorporativo;
-        vpn.CompaniaExterna = dto.EquipoCorporativo == false ? dto.CompaniaExterna!.Trim() : null;
-        vpn.CuentaCorreo = dto.CuentaCorreo!.Trim().ToLower();
-        vpn.Justificacion = dto.Motivo!.Trim();
+        AplicarFicha(vpn, dto);
         s.Estado = EnProceso;
 
         _context.HistorialSolicitudes.Add(new HistorialSolicitud
@@ -612,6 +607,28 @@ public partial class SolicitudesController : ControllerBase
         trabajador.Activo = false;
         trabajador.FechaSalida = salida;
         return $"Trabajador marcado como inactivo (fecha de salida {salida:dd-MM-yyyy}).";
+    }
+
+    private static Dictionary<string, string> ValidarFicha(FichaVpnDto dto) =>
+        SolicitudVpnValidator.ValidarFicha(new SolicitudVpnValidator.Ficha(
+            dto.FechaIncorporacion, dto.FechaCaducidad, dto.Rut, dto.Cargo, dto.Nombres, dto.Apellidos,
+            dto.Departamento, dto.UbicacionFisica, dto.EquipoCorporativo, dto.CompaniaExterna, dto.CuentaCorreo, dto.Motivo));
+
+    // Copia la ficha (ya validada) a la solicitud, con el mismo formato que el resto de la plataforma.
+    private static void AplicarFicha(SolicitudVpn vpn, FichaVpnDto dto)
+    {
+        vpn.FechaIncorporacion = dto.FechaIncorporacion;
+        vpn.FechaCaducidad = dto.FechaCaducidad;
+        vpn.Rut = TrabajadorValidator.FormatearParaGuardar(dto.Rut!);
+        vpn.Cargo = dto.Cargo!.Trim();
+        vpn.Nombres = FormatoNombre.Normalizar(dto.Nombres);
+        vpn.Apellidos = FormatoNombre.Normalizar(dto.Apellidos);
+        vpn.Departamento = dto.Departamento!.Trim();
+        vpn.UbicacionFisica = dto.UbicacionFisica!.Trim();
+        vpn.EquipoCorporativo = dto.EquipoCorporativo;
+        vpn.CompaniaExterna = dto.EquipoCorporativo == false ? dto.CompaniaExterna!.Trim() : null;
+        vpn.CuentaCorreo = dto.CuentaCorreo!.Trim().ToLower();
+        vpn.Justificacion = dto.Motivo!.Trim();
     }
 
     private static FlujoSolicitud.Situacion Situacion(Solicitud s, SolicitudVpn? vpn) =>
