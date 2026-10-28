@@ -55,7 +55,33 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     e.Property(x => x.Justificacion).HasMaxLength(200).IsRequired();
 });
 
-    // TrabajadorId es opcional solo por VPN; se mantiene el borrado en cascada que ya tenía.
+    // Datos del Ingreso: el trabajador se crea con ellos recién al completar la solicitud.
+    modelBuilder.Entity<SolicitudIngreso>(e =>
+{
+    e.HasOne(x => x.Solicitud).WithOne()
+        .HasForeignKey<SolicitudIngreso>(x => x.SolicitudId)
+        .OnDelete(DeleteBehavior.Restrict);
+    e.HasIndex(x => x.SolicitudId).IsUnique();
+    e.Property(x => x.Rut).HasMaxLength(20).IsRequired();
+    e.Property(x => x.Correo).HasMaxLength(150).IsRequired();
+});
+
+    // Registro de accesos VPN de proveedores: uno por solicitud VPN completada.
+    modelBuilder.Entity<AccesoVpn>(e =>
+{
+    e.HasOne(x => x.Solicitud).WithOne()
+        .HasForeignKey<AccesoVpn>(x => x.SolicitudId)
+        .OnDelete(DeleteBehavior.Restrict);
+    e.HasIndex(x => x.SolicitudId).IsUnique();
+    e.HasIndex(x => x.FechaHasta);
+    e.Property(x => x.Rut).HasMaxLength(20);
+    e.Property(x => x.Nombres).HasMaxLength(150);
+    e.Property(x => x.Apellidos).HasMaxLength(150);
+    e.Property(x => x.Motivo).HasMaxLength(150);
+});
+
+    // TrabajadorId es opcional: VPN no tiene trabajador, y un Ingreso no lo tiene hasta completarse.
+    // Se mantiene el borrado en cascada que ya tenía.
     modelBuilder.Entity<Solicitud>()
         .HasOne(s => s.Trabajador)
         .WithMany()
@@ -131,4 +157,6 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<RegistroDescarga> RegistrosDescarga => Set<RegistroDescarga>();
     public DbSet<CambioUsuarioSistema> CambiosUsuarioSistema => Set<CambioUsuarioSistema>();
     public DbSet<Feriado> Feriados => Set<Feriado>();
+    public DbSet<SolicitudIngreso> SolicitudesIngreso => Set<SolicitudIngreso>();
+    public DbSet<AccesoVpn> AccesosVpn => Set<AccesoVpn>();
 }

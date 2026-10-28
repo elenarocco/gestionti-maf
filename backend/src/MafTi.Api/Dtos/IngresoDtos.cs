@@ -26,7 +26,7 @@ public class IngresoCreateDto
 
 public class IngresoResultadoDto
 {
-    public int TrabajadorId { get; set; }
+    public int? TrabajadorId { get; set; }   // null: el trabajador se crea cuando TI completa la solicitud
     public int SolicitudId { get; set; }
     public DateTime FechaVencimientoSLA { get; set; }
 }
