@@ -11,7 +11,7 @@ namespace MafTi.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-// Quien puede dar acceso a usuarios puede darse cualquier rol: solo Super Admin (AdministrarUsuariosYRoles).
+// Quien puede dar acceso a usuarios puede darse cualquier rol: solo Gestión General (AdministrarUsuariosYRoles).
 // Las reglas (un acceso por persona, no bloquearse a sí mismo, nunca quedar sin administrador, área de
 // Jefatura) están en ReglasUsuarios; cada cambio queda en la bitácora CambiosUsuarioSistema.
 [RequierePermiso(PermisoAdministrar)]

@@ -8,7 +8,7 @@ using MafTi.Api.Seguridad;
 namespace MafTi.Api.Controllers;
 
 // Registro de accesos VPN de proveedores (se llena al completar cada solicitud VPN). Lo consulta TI y
-// quien puede ver todas las solicitudes (Auditoría, Super Admin).
+// quien puede ver todas las solicitudes (Auditoría, Gestión General).
 [ApiController]
 [Route("api/accesos-vpn")]
 [RequierePermiso("GestionarBandejaTI", "ConsultarTodasLasSolicitudes")]

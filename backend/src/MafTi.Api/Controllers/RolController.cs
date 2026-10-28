@@ -9,7 +9,7 @@ namespace MafTi.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 // Solo lectura: los roles y sus permisos se cambian con una migración revisada, no desde la app,
-// porque un cambio afecta a todos los usuarios del rol. Solo Super Admin (AdministrarUsuariosYRoles).
+// porque un cambio afecta a todos los usuarios del rol. Solo Gestión General (AdministrarUsuariosYRoles).
 [RequierePermiso("AdministrarUsuariosYRoles")]
 public class RolController : ControllerBase
 {
