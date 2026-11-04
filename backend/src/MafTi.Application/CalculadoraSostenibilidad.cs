@@ -41,8 +41,8 @@ public static class CalculadoraSostenibilidad
     // de la migración AgregarSostenibilidad cuando se ajusten los valores.
     public static readonly (string Parametro, string Descripcion)[] Fuentes =
     {
-        ("Hojas por formulario", "Valor inicial de ejemplo: 2 hojas por tipo de solicitud. Pendiente de confirmar con los formularios en papel reales."),
-        ("Copias impresas", "Se asume 1 copia por formulario."),
+        ("Hojas por formulario", "1 hoja por formulario en los cuatro tipos: confirmado por la jefatura; cada formulario en papel era una sola hoja."),
+        ("Copias impresas", "1 copia: el mismo formulario circulaba en mano para reunir las firmas de las jefaturas."),
         ("g CO2e por hoja", "Valor inicial 4,7 g CO2e por hoja A4, estimación de ciclo de vida del papel (fabricación y desecho). Pendiente de confirmar la fuente."),
         ("KB transferidos por solicitud", "Medido el 04-11-2026: 823 KB para el flujo completo de una solicitud (RRHH inicia sesión y la crea; Admin TI inicia sesión, la revisa en la Bandeja de TI, la aprueba y la completa), con caché vacía. No incluye el inicio de sesión de Microsoft."),
         ("g CO2e por MB", "Valor inicial 0,6 g CO2e por MB transferido, basado en el modelo Sustainable Web Design (energía de red, centro de datos y dispositivos por dato transferido)."),
