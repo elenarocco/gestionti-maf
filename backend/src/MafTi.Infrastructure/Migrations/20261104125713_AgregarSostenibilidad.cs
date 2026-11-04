@@ -32,8 +32,8 @@ namespace MafTi.Infrastructure.Migrations
                 });
 
             // Valores iniciales (ESTIMACIONES; se editan desde la pantalla Sostenibilidad):
-            // - Hojas por formulario = 2 en los cuatro tipos y 1 copia impresa: valores de ejemplo, pendientes de
-            //   confirmar con los formularios en papel reales.
+            // - Hojas por formulario = 1 en los cuatro tipos y 1 copia impresa: confirmado por la jefatura
+            //   (2026-11-04), cada formulario en papel era una sola hoja y circulaba en mano para las firmas.
             // - GramosCO2PorHoja = 4,7 g CO2e por hoja A4: estimación de ciclo de vida del papel (fabricación y
             //   desecho) entregada como valor inicial; la fuente exacta está pendiente de confirmar.
             // - KbTransferidosPorSolicitud = 823 KB: medido el 2026-11-04 con un navegador automatizado
@@ -49,7 +49,7 @@ namespace MafTi.Infrastructure.Migrations
                 INSERT INTO ""ParametrosSostenibilidad""
                     (""Id"", ""HojasIngreso"", ""HojasModificacion"", ""HojasBloqueo"", ""HojasVpn"", ""CopiasImpresas"",
                      ""GramosCO2PorHoja"", ""KbTransferidosPorSolicitud"", ""GramosCO2PorMB"", ""FechaActualizacion"")
-                SELECT 1, 2, 2, 2, 2, 1, 4.7, 823, 0.6, now()
+                SELECT 1, 1, 1, 1, 1, 1, 4.7, 823, 0.6, now()
                 WHERE NOT EXISTS (SELECT 1 FROM ""ParametrosSostenibilidad"" WHERE ""Id"" = 1);");
 
             // Permisos del módulo. Ver: Admin TI, Auditoría y Gestión General. Editar los supuestos y ver los datos
