@@ -28,10 +28,6 @@ Para dar o quitar una función a un rol basta con cambiar sus permisos (pantalla
 
 Además del permiso, la Jefatura **solo ve datos de su área** (trabajadores, solicitudes y Dashboard). Esa regla es por rol y está en `UsuarioActual.AreaRestringida`.
 
-### Permisos sin uso en el código
-
-La tabla `Permisos` también tiene `MarcarCompletada`, `RechazarSolicitud`, `RevisarAccesoVPN` y `RevisarAprobarBloqueo`, pero hoy ninguna parte del código los revisa: todas las acciones de la bandeja dependen de `GestionarBandejaTI`. Asignarlos o quitarlos no cambia nada.
-
 ## Ver qué tiene cada rol
 
 ```sql
