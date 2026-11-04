@@ -22,11 +22,16 @@ public static class CalculadoraSostenibilidad
     // Orden fijo para la pantalla y el gráfico (tipos tal como se guardan en la BD).
     public static readonly string[] Tipos = { TipoIngreso, TipoModificacion, TipoBloqueo, TipoVpn };
 
-    // Cantidades ficticias para el modo "datos de ejemplo" (solo para probar la pantalla).
+    // Modo "datos de ejemplo": un mes típico con los promedios mensuales informados por la jefatura
+    // (2026-11-04). No son solicitudes registradas en el sistema.
     public static readonly IReadOnlyDictionary<string, int> CantidadesEjemplo = new Dictionary<string, int>
     {
-        { TipoIngreso, 14 }, { TipoModificacion, 9 }, { TipoBloqueo, 6 }, { TipoVpn, 3 }
+        { TipoIngreso, 7 }, { TipoModificacion, 15 }, { TipoBloqueo, 3 }, { TipoVpn, 2 }
     };
+
+    public const string DescripcionEjemplo =
+        "Mes típico según los promedios mensuales informados por la jefatura (Ingreso 7, Modificación 15, " +
+        "Egreso o Bloqueo 3, VPN 2). No son solicitudes registradas en el sistema.";
 
     // Fórmulas tal como se aplican, para mostrarlas en el bloque "Supuestos y fuentes".
     public static readonly string[] Formulas =
@@ -46,6 +51,7 @@ public static class CalculadoraSostenibilidad
         ("g CO2e por hoja", "Valor inicial 4,7 g CO2e por hoja A4, estimación de ciclo de vida del papel (fabricación y desecho). Pendiente de confirmar la fuente."),
         ("KB transferidos por solicitud", "Medido el 04-11-2026: 823 KB para el flujo completo de una solicitud (RRHH inicia sesión y la crea; Admin TI inicia sesión, la revisa en la Bandeja de TI, la aprueba y la completa), con caché vacía. No incluye el inicio de sesión de Microsoft."),
         ("g CO2e por MB", "Valor inicial 0,6 g CO2e por MB transferido, basado en el modelo Sustainable Web Design (energía de red, centro de datos y dispositivos por dato transferido)."),
+        ("Traslado para firmas", "No incluido en el CO2e: el formulario en papel se trasladaba a mano para reunir las firmas de las jefaturas, sin vehículo. Su beneficio es de tiempo y trazabilidad, no de emisiones."),
     };
 
     public static int HojasPorFormulario(Parametros p, string tipo) => tipo switch

@@ -4,7 +4,8 @@ public class ResumenSostenibilidadDto
 {
     public DateOnly Desde { get; set; }               // fechas de Chile, ambas incluidas
     public DateOnly Hasta { get; set; }
-    public bool EsEjemplo { get; set; }               // true = cantidades ficticias, no reales
+    public bool EsEjemplo { get; set; }               // true = mes típico (promedios informados), no datos reales
+    public string? DescripcionEjemplo { get; set; }   // de dónde salen las cifras de ejemplo; null con datos reales
     public string Alcance { get; set; } = "Empresa completa";
     public int TotalSolicitudes { get; set; }         // solicitudes completadas (digitalizadas) en el rango
     public List<SostenibilidadTipoDto> CantidadPorTipo { get; set; } = new();

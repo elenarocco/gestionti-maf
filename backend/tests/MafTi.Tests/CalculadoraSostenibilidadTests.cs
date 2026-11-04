@@ -69,4 +69,18 @@ public class CalculadoraSostenibilidadTests
 
         Assert.Equal(new[] { "hojasBloqueo", "copiasImpresas", "gramosCO2PorHoja", "kbTransferidosPorSolicitud", "gramosCO2PorMB" }, errores.Keys);
     }
+
+    [Fact]
+    public void El_mes_tipico_de_ejemplo_con_1_hoja_por_formulario_da_27_hojas()
+    {
+        var p = Iniciales() with { HojasIngreso = 1, HojasModificacion = 1, HojasBloqueo = 1, HojasVpn = 1 };
+
+        var r = CalculadoraSostenibilidad.Calcular(CalculadoraSostenibilidad.CantidadesEjemplo, p);
+
+        Assert.Equal(27, r.TotalSolicitudes);          // 7 + 15 + 3 + 2
+        Assert.Equal(27, r.HojasEvitadas);
+        Assert.Equal(126.9m, r.Co2PapelEvitadoGramos);   // 27 × 4,7
+        Assert.Equal(13.3m, r.Co2SistemaGramos);         // 27 × 0,823 × 0,6 = 13,33
+        Assert.Equal(113.6m, r.AhorroNetoGramos);
+    }
 }

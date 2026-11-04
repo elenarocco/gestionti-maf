@@ -29,7 +29,7 @@ public class SostenibilidadController : ControllerBase
 
     // desde/hasta: fechas de Chile, ambas incluidas; por defecto, el mes en curso.
     // Cuenta las solicitudes Completadas según la fecha en que se completaron (historial).
-    // ejemplo=true usa cantidades ficticias y exige el permiso de edición (solo para probar la pantalla).
+    // ejemplo=true usa un mes típico (promedios mensuales informados por la jefatura) y exige el permiso de edición.
     [HttpGet("resumen")]
     [RequierePermiso(PermisoVer)]
     public async Task<ActionResult<ResumenSostenibilidadDto>> Resumen(DateOnly? desde = null, DateOnly? hasta = null, bool ejemplo = false)
@@ -89,6 +89,7 @@ public class SostenibilidadController : ControllerBase
             Desde = inicio,
             Hasta = fin,
             EsEjemplo = ejemplo,
+            DescripcionEjemplo = ejemplo ? CalculadoraSostenibilidad.DescripcionEjemplo : null,
             Alcance = alcance,
             TotalSolicitudes = r.TotalSolicitudes,
             CantidadPorTipo = r.PorTipo.Select(t => new SostenibilidadTipoDto
