@@ -46,6 +46,18 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.AgregarSeguridadHttp();
 
+// Comprime las respuestas JSON (Brotli o gzip, según lo que acepte el navegador): menos datos por la red.
+// Es seguro aunque vaya por HTTPS: la sesión viaja en la cabecera Authorization, no en las respuestas,
+// así que no hay un secreto que se pueda deducir del tamaño comprimido (ataque BREACH).
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
@@ -56,6 +68,7 @@ using (var scope = app.Services.CreateScope())
         await AuthDesarrollo.SembrarUsuariosAsync(db, scope.ServiceProvider.GetRequiredService<ILogger<Program>>());
 }
 app.UsarSeguridadHttp();
+app.UseResponseCompression();
 
 // Cualquier error no controlado se registra en el servidor y al cliente solo le llega un JSON genérico:
 // nunca un stack trace ni detalles internos, sin importar el entorno.
