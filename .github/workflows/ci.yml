@@ -1,0 +1,48 @@
+# Revisión automática del backend: compila, ejecuta los tests y verifica que no falte ninguna
+# migración, en cada push y Pull Request.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Si llega un push nuevo a la misma rama, se cancela la revisión anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Build, tests y migraciones
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restaurar paquetes
+        run: dotnet restore MafTi.slnx
+
+      - name: Build
+        run: dotnet build MafTi.slnx --configuration Release --no-restore
+
+      - name: Tests
+        run: dotnet test MafTi.slnx --configuration Release --no-build
+
+      # Falla si alguien cambió las entidades o el AppDbContext sin crear la migración.
+      # No se conecta a ninguna base: la cadena de conexión solo es para que la API arranque en modo diseño.
+      - name: Migraciones al día
+        env:
+          ConnectionStrings__Default: "Host=localhost;Database=ci;Username=ci;Password=ci"
+        run: |
+          dotnet tool install --global dotnet-ef --version "10.*"
+          dotnet ef migrations has-pending-model-changes --project src/MafTi.Infrastructure --startup-project src/MafTi.Api --configuration Release --no-build
