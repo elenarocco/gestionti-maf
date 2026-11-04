@@ -34,6 +34,7 @@ Principio del proyecto: **toda la lógica y las validaciones viven en el backend
 - [Flujo de solicitudes](docs/flujo-de-solicitudes.md): estados, acciones de TI, plazos (SLA) y qué cambia en la base al completar.
 - [Permisos](docs/permisos.md): qué habilita cada permiso y cómo revisar o cambiar lo que tiene cada rol.
 - [Sostenibilidad](docs/sostenibilidad.md): cálculo de papel evitado vs. huella del sistema, supuestos y cómo se midieron.
+- [Base de datos inicial para producción](docs/instalacion-base-de-datos.md): copia limpia de la base de desarrollo, sin datos de prueba.
 - [Configuración y secretos](backend/CONFIGURACION.md).
 
 ## Ramas
