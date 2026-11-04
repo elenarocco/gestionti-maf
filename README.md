@@ -38,5 +38,12 @@ Principio del proyecto: **toda la lógica y las validaciones viven en el backend
 
 ## Ramas
 
-- `feature/antonia` (backend) y `feature/antonia-v2` (frontend): versión de trabajo actual.
-- `main` / `develop`: pendientes de actualizar con la versión de trabajo.
+Mismas ramas en los dos repositorios:
+
+| Rama | Para qué |
+|---|---|
+| `main` | Versión entregada (estable). |
+| `develop` | Integración: lo que ya está probado y listo para la próxima entrega. |
+| `feature/antonia` (backend) / `feature/antonia-v2` (frontend) | Trabajo en curso. |
+
+Flujo: se trabaja en la rama de trabajo; cuando una versión está estable (CI en verde) pasa a `develop`, y en cada entrega `develop` pasa a `main`.
