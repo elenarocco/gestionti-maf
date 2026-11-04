@@ -139,6 +139,16 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
         e.Property(x => x.Nombre).HasMaxLength(100);
     });
 
+    // Una sola fila (Id = 1) con los supuestos de Sostenibilidad.
+    modelBuilder.Entity<ParametrosSostenibilidad>(e =>
+    {
+        e.ToTable("ParametrosSostenibilidad");
+        e.Property(x => x.Id).ValueGeneratedNever();
+        e.Property(x => x.GramosCO2PorHoja).HasPrecision(10, 3);
+        e.Property(x => x.KbTransferidosPorSolicitud).HasPrecision(12, 1);
+        e.Property(x => x.GramosCO2PorMB).HasPrecision(10, 3);
+    });
+
     // Ningún borrado se propaga: borrar un trabajador, usuario, solicitud, rol o catálogo que tenga registros
     // asociados falla en vez de llevarse en silencio usuarios, solicitudes, historial o accesos.
     // En este sistema nada se borra (los trabajadores se desactivan), así que no se pierde nada al exigirlo.
@@ -164,4 +174,5 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
     public DbSet<Feriado> Feriados => Set<Feriado>();
     public DbSet<SolicitudIngreso> SolicitudesIngreso => Set<SolicitudIngreso>();
     public DbSet<AccesoVpn> AccesosVpn => Set<AccesoVpn>();
+    public DbSet<ParametrosSostenibilidad> ParametrosSostenibilidad => Set<ParametrosSostenibilidad>();
 }

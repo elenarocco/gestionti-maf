@@ -14,6 +14,10 @@ public static class FlujoSolicitud
     public const string Corregir = "corregir";              // acción del creador: nueva solicitud enlazada
     public const string CompletarFichaVpn = "completarFicha"; // acción del creador de una VPN aprobada
 
+    // Textos del historial con que una solicitud queda Completada (los usa también Sostenibilidad).
+    public const string HistorialCompletada = "Completada";
+    public const string HistorialFichaEnviada = "Ficha VPN enviada al proveedor";
+
     public record Situacion(string Tipo, string Estado, bool FormularioHabilitado = false, bool FichaCompletada = false);
 
     // Acciones de Admin TI según tipo y estado (valores de BD).
@@ -89,8 +93,8 @@ public static class FlujoSolicitud
     public static string AccionHistorial(string accion, Situacion s) => accion switch
     {
         Tomar => s.Tipo == TipoVpn ? "Acceso VPN aprobado" : "Aprobada por TI",
-        Completar => "Completada",
-        ConfirmarEnvio => "Ficha VPN enviada al proveedor",
+        Completar => HistorialCompletada,
+        ConfirmarEnvio => HistorialFichaEnviada,
         Rechazar => "Rechazada",
         RechazarFicha => "Ficha VPN rechazada",
         _ => accion

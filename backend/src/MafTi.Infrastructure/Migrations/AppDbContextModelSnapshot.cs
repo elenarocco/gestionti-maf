@@ -241,6 +241,46 @@ namespace MafTi.Infrastructure.Migrations
                     b.ToTable("HistorialSolicitudes");
                 });
 
+            modelBuilder.Entity("MafTi.Domain.ParametrosSostenibilidad", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CopiasImpresas")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaActualizacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("GramosCO2PorHoja")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("numeric(10,3)");
+
+                    b.Property<decimal>("GramosCO2PorMB")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("numeric(10,3)");
+
+                    b.Property<int>("HojasBloqueo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HojasIngreso")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HojasModificacion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("HojasVpn")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("KbTransferidosPorSolicitud")
+                        .HasPrecision(12, 1)
+                        .HasColumnType("numeric(12,1)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ParametrosSostenibilidad", (string)null);
+                });
+
             modelBuilder.Entity("MafTi.Domain.Permiso", b =>
                 {
                     b.Property<int>("Id")
