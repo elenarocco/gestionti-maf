@@ -5,6 +5,7 @@ using MafTi.Domain;
 using MafTi.Api.Common;
 using MafTi.Api.Dtos;
 using MafTi.Api.Seguridad;
+using MafTi.Api.Notificaciones;
 using MafTi.Api.Reportes;
 using MafTi.Application;
 using static MafTi.Application.SolicitudValores;
@@ -26,12 +27,14 @@ public partial class SolicitudesController : ControllerBase
     private readonly AppDbContext _context;
     private readonly UsuarioActual _usuario;
     private readonly ServicioSla _sla;
+    private readonly NotificadorSolicitudes _notificador;
 
-    public SolicitudesController(AppDbContext context, UsuarioActual usuario, ServicioSla sla)
+    public SolicitudesController(AppDbContext context, UsuarioActual usuario, ServicioSla sla, NotificadorSolicitudes notificador)
     {
         _context = context;
         _usuario = usuario;
         _sla = sla;
+        _notificador = notificador;
     }
 
     // ---------- Bandeja de TI ----------
@@ -349,6 +352,12 @@ public partial class SolicitudesController : ControllerBase
             Comentario = comentario
         });
         await _context.SaveChangesAsync();
+
+        // Avisos por correo, después de guardar: si fallan, la acción ya quedó hecha (ver NotificadorSolicitudes).
+        if (esRechazo) await _notificador.SolicitudRechazadaAsync(s.Id);
+        else if (accion is FlujoSolicitud.Completar or FlujoSolicitud.ConfirmarEnvio) await _notificador.SolicitudCompletadaAsync(s.Id, comentario);
+        else if (accion == FlujoSolicitud.Tomar && vpn != null) await _notificador.VpnAprobadaAsync(s.Id);
+
         return NoContent();
     }
 
@@ -399,6 +408,7 @@ public partial class SolicitudesController : ControllerBase
         });
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
+        await _notificador.SolicitudCreadaAsync(solicitud.Id);
 
         return CreatedAtAction(nameof(DetalleVpn), new { id = solicitud.Id }, new CreadaDto { Id = solicitud.Id });
     }

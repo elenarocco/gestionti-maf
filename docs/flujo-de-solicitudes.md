@@ -17,6 +17,18 @@ Toda acción queda registrada en el historial de la solicitud (quién, cuándo y
 
 Quien creó una solicitud rechazada (excepto VPN) puede **corregirla**: se abre el mismo formulario con los datos anteriores y se crea una solicitud nueva enlazada a la original.
 
+## Avisos por correo
+
+| Evento | Destinatario |
+|---|---|
+| Solicitud nueva (los cuatro tipos) | TI (`Notificaciones:CorreoTi`, hoy `callcentermaf@mafchile.com`) |
+| Rechazada (incluye el motivo) | Quien creó la solicitud |
+| Completada | Quien creó la solicitud |
+| VPN aprobada por TI | Quien la pidió, para que complete la ficha del proveedor |
+
+Se envían con Microsoft Graph y en segundo plano: un correo que falla no detiene la solicitud. Configuración en
+[CONFIGURACION.md](../backend/CONFIGURACION.md#correos-de-notificación-microsoft-graph).
+
 ## Qué cambia en la base al completar
 
 Mientras una solicitud está abierta, **no modifica nada fuera de ella**. Los cambios se aplican recién cuando TI la marca como completada:

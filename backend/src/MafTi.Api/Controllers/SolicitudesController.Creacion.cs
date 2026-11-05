@@ -174,6 +174,7 @@ public partial class SolicitudesController
         
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
+        await _notificador.SolicitudCreadaAsync(nuevaSolicitud.Id);
         
         return Ok(new IngresoResultadoDto
         {
@@ -257,6 +258,7 @@ public partial class SolicitudesController
 
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
+        await _notificador.SolicitudCreadaAsync(nuevaSolicitud.Id);
 
         return CreatedAtAction(nameof(Detalle), new { id = nuevaSolicitud.Id }, new SolicitudBloqueoResultadoDto
         {
@@ -443,6 +445,7 @@ public partial class SolicitudesController
 
         await _context.SaveChangesAsync();
         await transaccion.CommitAsync();
+        await _notificador.SolicitudCreadaAsync(nuevaSolicitud.Id);
 
         return CreatedAtAction(nameof(Detalle), new { id = nuevaSolicitud.Id }, new SolicitudModificacionResultadoDto
         {

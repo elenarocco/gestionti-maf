@@ -2,9 +2,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MafTi.Domain\MafTi.Domain.csproj" />
+    <ProjectReference Include="..\MafTi.Application\MafTi.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Microsoft.Graph" Version="6.8.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 

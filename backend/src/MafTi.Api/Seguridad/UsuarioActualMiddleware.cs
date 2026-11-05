@@ -6,7 +6,8 @@ namespace MafTi.Api.Seguridad;
 
 // Toda ruta /api exige sesión: un token válido cuyo correo corresponda a un trabajador activo
 // con un UsuarioSistema activo. De ahí salen userId, rol y areaId.
-// Excepción: /api/auth/dev/*, que solo existe en Development (login de desarrollo).
+// Excepciones: /api/auth/dev/* (login de desarrollo) y /api/dev/* (correo de prueba), que solo se registran
+// en Development: en producción esas rutas no existen y responden 404.
 public class UsuarioActualMiddleware
 {
     private readonly RequestDelegate _next;
@@ -19,7 +20,7 @@ public class UsuarioActualMiddleware
     public async Task InvokeAsync(HttpContext context, AppDbContext db, UsuarioActual usuarioActual)
     {
         var ruta = context.Request.Path;
-        if (!ruta.StartsWithSegments("/api") || ruta.StartsWithSegments("/api/auth/dev"))
+        if (!ruta.StartsWithSegments("/api") || ruta.StartsWithSegments("/api/auth/dev") || ruta.StartsWithSegments("/api/dev"))
         {
             await _next(context);
             return;

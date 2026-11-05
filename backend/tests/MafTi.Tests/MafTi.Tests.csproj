@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MafTi.Application\MafTi.Application.csproj" />
     <ProjectReference Include="..\..\src\MafTi.Domain\MafTi.Domain.csproj" />
+    <ProjectReference Include="..\..\src\MafTi.Infrastructure\MafTi.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using MafTi.Api.Seguridad;
 using MafTi.Infrastructure;
+using MafTi.Infrastructure.Correo;
+using MafTi.Application.Notificaciones;
+using MafTi.Api.Notificaciones;
 
 var builder = WebApplication.CreateBuilder(args);
 var esDesarrollo = builder.Environment.IsDevelopment();
@@ -38,6 +41,27 @@ auth.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
 if (esDesarrollo) auth.AgregarEsquema(builder.Configuration);
 
 builder.Services.AddScoped<UsuarioActual>();
+
+// Correos de notificación (Microsoft Graph). Con Graph:Habilitado = false (por defecto) no se envía nada:
+// NoOpEmailService solo lo registra en el log. Ver backend/CONFIGURACION.md.
+builder.Services.Configure<OpcionesGraph>(builder.Configuration.GetSection(OpcionesGraph.Seccion));
+builder.Services.Configure<OpcionesNotificaciones>(builder.Configuration.GetSection(OpcionesNotificaciones.Seccion));
+var opcionesGraph = builder.Configuration.GetSection(OpcionesGraph.Seccion).Get<OpcionesGraph>() ?? new OpcionesGraph();
+if (opcionesGraph.Habilitado)
+{
+    if (opcionesGraph.Faltantes() is { Count: > 0 } faltantes)
+        throw new InvalidOperationException(
+            $"Graph:Habilitado = true, pero falta: {string.Join(", ", faltantes)}. En desarrollo van en user-secrets; " +
+            "en el servidor, en variables de entorno (Graph__ClientSecret, ...). Ver backend/CONFIGURACION.md.");
+    builder.Services.AddSingleton<IEmailService, GraphEmailService>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailService, NoOpEmailService>();
+}
+builder.Services.AddSingleton<ColaCorreos>();
+builder.Services.AddHostedService<EnvioCorreosService>();
+builder.Services.AddScoped<NotificadorSolicitudes>();
 builder.Services.AddScoped<MafTi.Api.Common.ServicioSla>();
 
 builder.Services.AddOpenApi();
@@ -92,6 +116,10 @@ app.UseAuthentication();
 app.UseMiddleware<UsuarioActualMiddleware>();
 app.MapControllers();
 
-if (esDesarrollo) AuthDesarrollo.MapearEndpoints(app);
+if (esDesarrollo)
+{
+    AuthDesarrollo.MapearEndpoints(app);
+    CorreoDesarrollo.MapearEndpoints(app);
+}
 
 app.Run();

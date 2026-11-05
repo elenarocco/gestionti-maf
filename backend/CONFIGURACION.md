@@ -10,6 +10,12 @@ no arranca y muestra un mensaje que dice cuál falta y cómo configurarlo.
 | `AzureAd:TenantId`, `AzureAd:ClientId`, `AzureAd:Audience` | Datos de la app en Microsoft Entra ID | No (son públicos) | Siempre; ya están en `appsettings.json` |
 | `Cors:Origenes` | URL(s) del frontend que pueden llamar a la API desde el navegador | No | Siempre; en desarrollo ya viene `http://localhost:4200` |
 | `AllowedHosts` | Dominio(s) por los que se llega a la API, separados por `;` | No | Obligatorio fuera de desarrollo (no se acepta `*`) |
+| `Graph:Habilitado` | `true` envía los correos de notificación con Microsoft Graph; `false` (por defecto) solo los registra en el log | No | Siempre |
+| `Graph:TenantId`, `Graph:ClientId`, `Graph:ClientSecret` | App de Entra ID con el permiso de aplicación **Mail.Send** de Microsoft Graph | Sí | Solo con `Graph:Habilitado = true` |
+| `Graph:Buzon` | Casilla desde la que se envían los correos | No | Solo con `Graph:Habilitado = true` |
+| `Notificaciones:CorreoTi` | Casilla que recibe el aviso de cada solicitud nueva | No | Ya viene en `appsettings.json` (`callcentermaf@mafchile.com`) |
+| `Notificaciones:UrlFront` | URL del frontend, para los enlaces de los correos | No | En desarrollo ya viene `http://localhost:4200` |
+| `Notificaciones:RedirigirA` | Solo para pruebas: si tiene un valor, **todos** los correos van a esa dirección | No | Vacío en producción |
 
 ## En tu equipo (desarrollo)
 
@@ -37,6 +43,12 @@ ConnectionStrings__Default=Host=...;Port=5432;Database=maf_ti;Username=...;Passw
 Cors__Origenes__0=https://<dominio del frontend>
 AllowedHosts=<dominio de la API>
 ASPNETCORE_HTTPS_PORT=443
+Graph__Habilitado=true
+Graph__TenantId=<tenant>
+Graph__ClientId=<client id de la app con Mail.Send>
+Graph__ClientSecret=<secreto>
+Graph__Buzon=<casilla que envía>
+Notificaciones__UrlFront=https://<dominio del frontend>
 ```
 
 Si hay más de un frontend permitido: `Cors__Origenes__1=...`, `Cors__Origenes__2=...`. Si la API se
@@ -55,10 +67,34 @@ HTTPS:
 - Una petición por HTTP se redirige a HTTPS (por eso `ASPNETCORE_HTTPS_PORT=443`), y las respuestas por HTTPS
   llevan HSTS: el navegador recuerda usar siempre HTTPS con ese dominio.
 
+### Correos de notificación (Microsoft Graph)
+
+La API envía correos en cuatro momentos: **solicitud nueva** (a `Notificaciones:CorreoTi`), **rechazada** (a quien
+la creó, con el motivo), **completada** (a quien la creó) y **VPN aprobada por TI** (a quien la pidió, para que
+complete la ficha). Se envían en segundo plano: la solicitud se guarda y responde aunque el correo falle; el
+error queda en el log. Si la API se reinicia con correos pendientes en la cola, esos correos se pierden.
+
+Lo que configura TI en Entra ID y Exchange Online (una vez):
+
+1. Una app registrada con el permiso de aplicación **Microsoft Graph → Mail.Send** y consentimiento de administrador.
+2. Un secreto de cliente para esa app (va en `Graph__ClientSecret`).
+3. **Restringir la app al buzón que envía** (RBAC for Applications o Application Access Policy en Exchange Online).
+   Sin esa restricción, Mail.Send permite enviar como cualquier persona de la organización.
+
+Para probar en desarrollo (las credenciales en user-secrets, nunca en `appsettings`):
+
+```bash
+dotnet user-secrets set "Graph:Habilitado" "true"
+dotnet user-secrets set "Notificaciones:RedirigirA" "tu.correo@mafchile.com"   # opcional: todo llega a tu casilla
+```
+
+y con la API corriendo: `POST http://localhost:5153/api/dev/correo-prueba?para=tu.correo@mafchile.com`. La respuesta
+dice si se envió o el motivo del error. Esa ruta solo existe en Development.
+
 ### Qué revisa la API al arrancar
 
 Si falta algo, la API **no arranca** y dice qué falta: la cadena de conexión, los datos de Entra ID,
-`Cors:Origenes` y, fuera de desarrollo, `AllowedHosts`. En producción, además, no existen el login de
+`Cors:Origenes`, fuera de desarrollo `AllowedHosts` y, con `Graph:Habilitado = true`, las claves de `Graph`. En producción, además, no existen el login de
 desarrollo ni Swagger.
 
 - `AuthDesarrollo__Clave` **no se configura** en el servidor: fuera de Development el login de desarrollo no
